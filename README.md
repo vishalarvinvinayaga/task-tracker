@@ -20,34 +20,47 @@ Two ways to interact with the same data:
 | MCP server | Python, official `mcp` SDK, stdio transport |
 | Search | Postgres full-text search (`tsvector` + GIN indexes) |
 
-## Prerequisites
-
-- macOS with [Homebrew](https://brew.sh)
-- Python 3.12 (`brew install python@3.12`) — the system Python 3.9 is too old
-- Node.js 18+ and npm
-- PostgreSQL 14 (`brew install postgresql@14`)
-
 ## First-time setup
 
-From the project root:
+macOS only. From the project root, after cloning:
 
 ```bash
-./scripts/setup_db.sh
+./setup.sh
 ```
 
-This one script:
-- starts Postgres via Homebrew if it isn't running
-- creates a dedicated `planner` role and `planner_db` database (safe to re-run)
-- copies `backend/.env.example` to `backend/.env` if missing
-- runs Alembic migrations
-- seeds reference data (5 workstream tags, 5 templates)
+This checks/installs Homebrew, Python 3.12, Node 18+, and Postgres 14 (via Homebrew — skips
+anything already present), then sets up the backend venv, the database (role, migrations,
+seed data), the frontend's `node_modules`, the MCP server venv, and rewrites `.mcp.json` to
+this machine's actual clone path. Safe to re-run any time — every step skips if already done.
 
-Then install the frontend dependencies:
+Homebrew itself is the one exception: if it's missing, the script prints the official install
+command and stops, rather than running an unattended system-level installer for you.
+
+<details>
+<summary>Prerequisites setup.sh installs for you</summary>
+
+- macOS with [Homebrew](https://brew.sh)
+- Python 3.12 — the system Python (3.9 on most Macs) is too old
+- Node.js 18+ and npm
+- PostgreSQL 14
+
+</details>
+
+<details>
+<summary>Doing it by hand instead</summary>
 
 ```bash
-cd frontend
-npm install
+./scripts/setup_db.sh     # Postgres role/db, migrations, seed data
+cd frontend && npm install
+cd mcp-server && python3.12 -m venv venv && venv/bin/pip install -r requirements.txt
 ```
+
+`scripts/setup_db.sh` alone: starts Postgres via Homebrew if it isn't running, creates a
+dedicated `planner` role and `planner_db` database (safe to re-run), copies
+`backend/.env.example` to `backend/.env` if missing, runs Alembic migrations, and seeds
+reference data (5 workstream tags, 5 templates).
+
+</details>
 
 ## Running day-to-day
 
