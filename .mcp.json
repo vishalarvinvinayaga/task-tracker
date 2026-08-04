@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "personal-planner": {
+      "type": "stdio",
+      "command": "/Users/vishalarvin/Documents/task-planner-tracker/mcp-server/venv/bin/python",
+      "args": ["/Users/vishalarvin/Documents/task-planner-tracker/mcp-server/server.py"]
+    }
+  }
+}

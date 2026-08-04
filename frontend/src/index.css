@@ -1,0 +1,97 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light dark;
+  --accent-from: #3b82f6;
+  --accent-via: #6366f1;
+  --accent-to: #a855f7;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  @apply text-gray-900 dark:text-gray-100;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background-color: #f8fafc;
+  background-image:
+    radial-gradient(1200px 600px at 100% -10%, rgba(99, 102, 241, 0.06), transparent),
+    radial-gradient(900px 500px at -10% 110%, rgba(168, 85, 247, 0.05), transparent);
+  background-attachment: fixed;
+}
+
+:root[data-theme="dark"] body,
+.dark body {
+  background-color: #05070d;
+  background-image:
+    radial-gradient(1000px 600px at 100% -10%, rgba(99, 102, 241, 0.18), transparent),
+    radial-gradient(900px 600px at -10% 110%, rgba(168, 85, 247, 0.14), transparent),
+    radial-gradient(600px 400px at 50% 40%, rgba(59, 130, 246, 0.06), transparent);
+  background-attachment: fixed;
+}
+
+code,
+pre {
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+@layer components {
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(90deg, var(--accent-from), var(--accent-via), var(--accent-to));
+  }
+
+  /* Intentionally no padding/rounding here — call sites keep their own sizing.
+     Only supplies the gradient fill, hover glow, and lift. */
+  .btn-primary {
+    @apply text-white transition-all duration-200;
+    background-image: linear-gradient(90deg, var(--accent-from), var(--accent-via));
+    box-shadow: 0 0 0 rgba(99, 102, 241, 0);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 4px 24px -4px rgba(99, 102, 241, 0.55);
+    transform: translateY(-1px);
+  }
+  .btn-primary:disabled {
+    @apply opacity-50;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .glass-panel {
+    @apply border border-gray-200/70 bg-white/80 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04];
+  }
+
+  .glass-card {
+    @apply rounded-xl border border-gray-200/70 bg-white/90 backdrop-blur-xl transition-all duration-200 dark:border-white/[0.08] dark:bg-white/[0.03];
+  }
+  .glass-card:hover {
+    @apply border-indigo-300/60 dark:border-indigo-400/30;
+    box-shadow: 0 8px 30px -12px rgba(99, 102, 241, 0.35);
+  }
+
+  .progress-track {
+    @apply h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-white/[0.06];
+  }
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-500;
+    background-image: linear-gradient(90deg, var(--accent-from), var(--accent-via), var(--accent-to));
+  }
+
+  .glow-dot {
+    box-shadow: 0 0 8px 1px currentColor;
+  }
+
+  .nav-item-active {
+    @apply text-white;
+    background-image: linear-gradient(90deg, var(--accent-from), var(--accent-via));
+    box-shadow: 0 4px 20px -6px rgba(99, 102, 241, 0.6);
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "personal-planner": {
+      "command": "/absolute/path/to/task-planner-tracker/mcp-server/venv/bin/python",
+      "args": ["/absolute/path/to/task-planner-tracker/mcp-server/server.py"]
+    }
+  }
+}

@@ -1,0 +1,26 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.env
+mcp-server/venv/
+mcp-server/__pycache__/
+mcp-server/**/__pycache__/
+*.pyc
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# Data
+data/attachments/*
+!data/attachments/.gitkeep
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+.run/
