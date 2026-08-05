@@ -1,3 +1,4 @@
+import re
 import uuid
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from app.models import Attachment
 from app.schemas import AttachmentRead, AttachmentSource
 
 router = APIRouter(prefix="/api/attachments", tags=["attachments"])
+
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB
 
 
 @router.get("", response_model=list[AttachmentRead])
@@ -45,11 +48,20 @@ async def upload_attachment(
         raise HTTPException(400, "Exactly one of task_id, note_id, kb_article_id is required")
 
     original_name = file.filename or "upload.bin"
-    ext = Path(original_name).suffix
+    if not original_name.strip():
+        raise HTTPException(400, "A filename is required")
+
+    # The stored name is generated server-side, so the client's filename never
+    # reaches the filesystem — only a sanitised extension is carried over.
+    ext = Path(original_name).suffix.lower()
+    if not re.fullmatch(r"\.[A-Za-z0-9]{1,12}", ext or ""):
+        ext = ""
     stored_name = f"{uuid.uuid4().hex}{ext}"
     dest = settings.attachments_path / stored_name
 
     contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"File exceeds the {MAX_UPLOAD_BYTES // 1_048_576} MB limit")
     dest.write_bytes(contents)
 
     attachment = Attachment(
@@ -79,8 +91,11 @@ def delete_attachment(attachment_id: int, db: Session = Depends(get_db)):
     attachment = db.get(Attachment, attachment_id)
     if not attachment:
         raise HTTPException(404, "Attachment not found")
-    file_path = settings.attachments_path / attachment.file_path
-    if file_path.exists():
+    # Defensive: only ever unlink inside the attachments directory, even if the
+    # stored path were somehow tampered with.
+    root = settings.attachments_path.resolve()
+    file_path = (root / attachment.file_path).resolve()
+    if file_path.is_relative_to(root) and file_path.is_file():
         file_path.unlink()
     db.delete(attachment)
     db.commit()

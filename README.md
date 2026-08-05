@@ -87,6 +87,33 @@ cd backend && venv/bin/uvicorn app.main:app --reload
 cd frontend && npm run dev
 ```
 
+## Tests
+
+```bash
+cd backend && venv/bin/pytest
+```
+
+131 tests covering every router plus an adversarial suite (injection, XSS, path traversal,
+upload hardening). They run against **`planner_test_db`** — a separate database — and
+`conftest.py` aborts if pointed anywhere else, so running them can never touch your real data.
+
+First time only, create the test database:
+
+```bash
+createdb -h 127.0.0.1 -O planner planner_test_db
+```
+
+Audit dependencies for known CVEs:
+
+```bash
+cd backend && venv/bin/pip-audit
+```
+
+## Documentation
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system diagrams, data model, trust boundaries
+- [`docs/QA_REPORT.md`](docs/QA_REPORT.md) — test results, bugs fixed, security findings
+
 ## Resetting your data
 
 Once you start using the app for real, wipe the demo/test data with:

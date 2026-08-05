@@ -3,19 +3,39 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class SanitizedModel(BaseModel):
+    """
+    Base for every request/response schema.
+
+    Postgres text columns cannot store NUL bytes — psycopg raises and the
+    request 500s. Strip them on the way in so hostile or accidentally-binary
+    input degrades to clean text instead of an unhandled error.
+    """
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _strip_nul_bytes(cls, value):
+        if isinstance(value, str):
+            return value.replace("\x00", "")
+        if isinstance(value, list):
+            return [v.replace("\x00", "") if isinstance(v, str) else v for v in value]
+        return value
+
 
 # ---------------- Tags ----------------
 
 
-class TagRead(BaseModel):
+class TagRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
     color: str
 
 
-class TagCreate(BaseModel):
+class TagCreate(SanitizedModel):
     name: str
     color: str = "#6B7280"
 
@@ -25,7 +45,7 @@ class TagCreate(BaseModel):
 SprintStatus = Literal["planned", "active", "closed"]
 
 
-class SprintGoalRead(BaseModel):
+class SprintGoalRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     sprint_id: int
@@ -34,17 +54,17 @@ class SprintGoalRead(BaseModel):
     created_at: dt.datetime
 
 
-class SprintGoalCreate(BaseModel):
+class SprintGoalCreate(SanitizedModel):
     title: str
-    progress_pct: int = 0
+    progress_pct: int = Field(default=0, ge=0, le=100)
 
 
-class SprintGoalUpdate(BaseModel):
+class SprintGoalUpdate(SanitizedModel):
     title: str | None = None
-    progress_pct: int | None = None
+    progress_pct: int | None = Field(default=None, ge=0, le=100)
 
 
-class SprintRetroRead(BaseModel):
+class SprintRetroRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     sprint_id: int
@@ -54,13 +74,13 @@ class SprintRetroRead(BaseModel):
     created_at: dt.datetime
 
 
-class SprintRetroUpsert(BaseModel):
+class SprintRetroUpsert(SanitizedModel):
     went_well: str | None = None
     needs_improvement: str | None = None
     action_items: str | None = None
 
 
-class SprintCreate(BaseModel):
+class SprintCreate(SanitizedModel):
     name: str
     goals_summary: str | None = None
     start_date: dt.date
@@ -68,7 +88,7 @@ class SprintCreate(BaseModel):
     status: SprintStatus = "planned"
 
 
-class SprintUpdate(BaseModel):
+class SprintUpdate(SanitizedModel):
     name: str | None = None
     goals_summary: str | None = None
     start_date: dt.date | None = None
@@ -76,7 +96,7 @@ class SprintUpdate(BaseModel):
     status: SprintStatus | None = None
 
 
-class SprintRead(BaseModel):
+class SprintRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
@@ -94,7 +114,7 @@ class SprintWithStats(SprintRead):
     goals: list[SprintGoalRead] = []
 
 
-class SprintCloseRequest(BaseModel):
+class SprintCloseRequest(SanitizedModel):
     carry_task_ids: list[int] = Field(default_factory=list)
     next_sprint_id: int
 
@@ -106,7 +126,7 @@ TaskPriority = Literal["low", "medium", "high", "urgent"]
 TaskType = Literal["general", "development"]
 
 
-class TaskCreate(BaseModel):
+class TaskCreate(SanitizedModel):
     title: str
     description_md: str | None = None
     status: TaskStatus = "todo"
@@ -121,7 +141,7 @@ class TaskCreate(BaseModel):
     template_id: int | None = None
 
 
-class TaskUpdate(BaseModel):
+class TaskUpdate(SanitizedModel):
     title: str | None = None
     description_md: str | None = None
     status: TaskStatus | None = None
@@ -136,12 +156,12 @@ class TaskUpdate(BaseModel):
     tag_ids: list[int] | None = None
 
 
-class TaskMove(BaseModel):
+class TaskMove(SanitizedModel):
     status: TaskStatus
     sort_order: int | None = None
 
 
-class TaskRead(BaseModel):
+class TaskRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     sprint_id: int
@@ -175,7 +195,7 @@ NoteSource = Literal["manual", "claude_code", "claude_desktop"]
 LinkType = Literal["reference", "related", "followup"]
 
 
-class NoteCreate(BaseModel):
+class NoteCreate(SanitizedModel):
     title: str
     content_md: str | None = None
     task_id: int | None = None
@@ -185,7 +205,7 @@ class NoteCreate(BaseModel):
     tag_ids: list[int] = Field(default_factory=list)
 
 
-class NoteUpdate(BaseModel):
+class NoteUpdate(SanitizedModel):
     title: str | None = None
     content_md: str | None = None
     task_id: int | None = None
@@ -194,7 +214,7 @@ class NoteUpdate(BaseModel):
     tag_ids: list[int] | None = None
 
 
-class NoteRead(BaseModel):
+class NoteRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     task_id: int | None
@@ -208,7 +228,7 @@ class NoteRead(BaseModel):
     tags: list[TagRead] = []
 
 
-class NoteSearchResult(BaseModel):
+class NoteSearchResult(SanitizedModel):
     id: int
     title: str
     snippet: str
@@ -216,12 +236,12 @@ class NoteSearchResult(BaseModel):
     created_at: dt.datetime
 
 
-class NoteLinkCreate(BaseModel):
+class NoteLinkCreate(SanitizedModel):
     to_note_id: int
     link_type: LinkType = "reference"
 
 
-class NoteLinkRead(BaseModel):
+class NoteLinkRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     from_note_id: int
@@ -233,7 +253,7 @@ class NoteLinkRead(BaseModel):
 # ---------------- KB ----------------
 
 
-class KbArticleCreate(BaseModel):
+class KbArticleCreate(SanitizedModel):
     title: str
     content_md: str | None = None
     category: str | None = None
@@ -241,14 +261,14 @@ class KbArticleCreate(BaseModel):
     tag_ids: list[int] = Field(default_factory=list)
 
 
-class KbArticleUpdate(BaseModel):
+class KbArticleUpdate(SanitizedModel):
     title: str | None = None
     content_md: str | None = None
     category: str | None = None
     tag_ids: list[int] | None = None
 
 
-class KbArticleRead(BaseModel):
+class KbArticleRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     title: str
@@ -260,7 +280,7 @@ class KbArticleRead(BaseModel):
     tags: list[TagRead] = []
 
 
-class KbSearchResult(BaseModel):
+class KbSearchResult(SanitizedModel):
     id: int
     title: str
     snippet: str
@@ -268,7 +288,7 @@ class KbSearchResult(BaseModel):
     created_at: dt.datetime
 
 
-class PromoteNoteRequest(BaseModel):
+class PromoteNoteRequest(SanitizedModel):
     category: str | None = None
 
 
@@ -277,7 +297,7 @@ class PromoteNoteRequest(BaseModel):
 AttachmentSource = Literal["upload", "claude_code", "clipboard"]
 
 
-class AttachmentRead(BaseModel):
+class AttachmentRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     task_id: int | None
@@ -296,7 +316,7 @@ class AttachmentRead(BaseModel):
 LogType = Literal["punch_in", "punch_out", "task_time"]
 
 
-class TimeLogRead(BaseModel):
+class TimeLogRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     task_id: int | None
@@ -308,24 +328,24 @@ class TimeLogRead(BaseModel):
     created_at: dt.datetime
 
 
-class PunchRequest(BaseModel):
+class PunchRequest(SanitizedModel):
     notes: str | None = None
 
 
-class TaskTimeCreate(BaseModel):
+class TaskTimeCreate(SanitizedModel):
     task_id: int
     duration_hours: float
     notes: str | None = None
 
 
-class TimeStatus(BaseModel):
+class TimeStatus(SanitizedModel):
     punched_in: bool
     session_start: dt.datetime | None = None
     session_duration_hours: float | None = None
     today_total_hours: float = 0
 
 
-class TimeBreakdownEntry(BaseModel):
+class TimeBreakdownEntry(SanitizedModel):
     tag_name: str
     color: str
     hours: float
@@ -336,18 +356,18 @@ class TimeBreakdownEntry(BaseModel):
 TemplateType = Literal["task", "meeting_note", "sprint"]
 
 
-class TemplateCreate(BaseModel):
+class TemplateCreate(SanitizedModel):
     name: str
     template_type: TemplateType
     content_json: dict[str, Any]
 
 
-class TemplateUpdate(BaseModel):
+class TemplateUpdate(SanitizedModel):
     name: str | None = None
     content_json: dict[str, Any] | None = None
 
 
-class TemplateRead(BaseModel):
+class TemplateRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
@@ -362,7 +382,7 @@ class TemplateRead(BaseModel):
 Frequency = Literal["daily", "weekly", "monthly"]
 
 
-class RecurringTaskCreate(BaseModel):
+class RecurringTaskCreate(SanitizedModel):
     template_id: int | None = None
     title: str
     description_md: str | None = None
@@ -373,7 +393,7 @@ class RecurringTaskCreate(BaseModel):
     active: bool = True
 
 
-class RecurringTaskUpdate(BaseModel):
+class RecurringTaskUpdate(SanitizedModel):
     title: str | None = None
     description_md: str | None = None
     frequency: Frequency | None = None
@@ -383,7 +403,7 @@ class RecurringTaskUpdate(BaseModel):
     active: bool | None = None
 
 
-class RecurringTaskRead(BaseModel):
+class RecurringTaskRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     template_id: int | None
@@ -403,11 +423,11 @@ class RecurringTaskRead(BaseModel):
 ResolveTarget = Literal["task", "note", "kb", "dismissed"]
 
 
-class InboxItemCreate(BaseModel):
+class InboxItemCreate(SanitizedModel):
     content: str
 
 
-class InboxItemRead(BaseModel):
+class InboxItemRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     content: str
@@ -417,7 +437,7 @@ class InboxItemRead(BaseModel):
     resolved_at: dt.datetime | None
 
 
-class InboxResolveRequest(BaseModel):
+class InboxResolveRequest(SanitizedModel):
     resolve_to: ResolveTarget
     target_data: dict[str, Any] | None = None
 
@@ -425,7 +445,7 @@ class InboxResolveRequest(BaseModel):
 # ---------------- Activity log ----------------
 
 
-class ActivityLogRead(BaseModel):
+class ActivityLogRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     entity_type: str
@@ -438,21 +458,21 @@ class ActivityLogRead(BaseModel):
 # ---------------- Dashboard / planning ----------------
 
 
-class TodayPlan(BaseModel):
+class TodayPlan(SanitizedModel):
     active_sprint: SprintWithStats | None
     today_tasks: list[TaskRead]
     time_status: TimeStatus
     inbox_count: int
 
 
-class StandupSummary(BaseModel):
+class StandupSummary(SanitizedModel):
     yesterday_completed: list[TaskRead]
     yesterday_activity: list[ActivityLogRead]
     today_planned: list[TaskRead]
     blocked: list[TaskRead]
 
 
-class WeeklySummary(BaseModel):
+class WeeklySummary(SanitizedModel):
     week_start: dt.date
     week_end: dt.date
     tasks_completed: int
@@ -465,7 +485,7 @@ class WeeklySummary(BaseModel):
 # ---------------- Send-to-task (Claude Code pipeline) ----------------
 
 
-class SendToTaskRequest(BaseModel):
+class SendToTaskRequest(SanitizedModel):
     task_id: int
     content_md: str
     title: str | None = None
@@ -476,7 +496,7 @@ class SendToTaskRequest(BaseModel):
 ThemePreset = Literal["indigo", "emerald", "rose", "cyan", "amber", "slate"]
 
 
-class UserProfileRead(BaseModel):
+class UserProfileRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
@@ -486,13 +506,13 @@ class UserProfileRead(BaseModel):
     updated_at: dt.datetime
 
 
-class UserProfileCreate(BaseModel):
+class UserProfileCreate(SanitizedModel):
     name: str
     timezone: str = "UTC"
     theme_preset: ThemePreset = "indigo"
 
 
-class UserProfileUpdate(BaseModel):
+class UserProfileUpdate(SanitizedModel):
     name: str | None = None
     timezone: str | None = None
     theme_preset: ThemePreset | None = None

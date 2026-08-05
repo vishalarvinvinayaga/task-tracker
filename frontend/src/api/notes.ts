@@ -6,7 +6,8 @@ export type NoteCreateInput = {
   content_md?: string;
   task_id?: number | null;
   note_type?: string;
-  attendees?: string;
+  /** null explicitly clears the field server-side; undefined leaves it alone. */
+  attendees?: string | null;
   source?: string;
   tag_ids?: number[];
 };
