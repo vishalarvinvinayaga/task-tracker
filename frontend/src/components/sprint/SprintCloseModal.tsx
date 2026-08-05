@@ -28,7 +28,13 @@ export function SprintCloseModal({
       setIncomplete(inc);
       setCarryIds(new Set(inc.map((t) => t.id)));
     });
-    sprintsApi.list().then((sprints) => setOtherSprints(sprints.filter((s) => s.id !== sprint.id && s.status !== "closed")));
+    // Carry-over targets: any open container that isn't this one. Lists are
+    // valid destinations too — parking work on the Backlog is a real choice.
+    sprintsApi
+      .list()
+      .then((containers) =>
+        setOtherSprints(containers.filter((c) => c.id !== sprint.id && c.status !== "closed")),
+      );
   }, [sprint.id]);
 
   function toggle(id: number) {

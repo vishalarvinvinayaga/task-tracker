@@ -40,7 +40,7 @@ def add_task(
     priority: low|medium|high|urgent. task_type: general|development. due_date: YYYY-MM-DD."""
     with session() as db:
         if sprint_id is None:
-            sprint = db.execute(select(Sprint).where(Sprint.status == "active")).scalar_one_or_none()
+            sprint = db.execute(select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")).scalar_one_or_none()
             if not sprint:
                 return {"error": "No active sprint. Specify sprint_id or activate a sprint first."}
             sprint_id = sprint.id

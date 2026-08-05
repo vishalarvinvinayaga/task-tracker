@@ -4,10 +4,18 @@ def test_create_defaults_to_active_sprint(client, sprint):
     assert resp.json()["sprint_id"] == sprint["id"]
 
 
-def test_create_without_active_sprint_is_rejected(client):
-    resp = client.post("/api/tasks", json={"title": "orphan"})
-    assert resp.status_code == 400
-    assert "No active sprint" in resp.json()["detail"]
+def test_create_without_any_sprint_lands_in_backlog(client):
+    """
+    The never-blocked guarantee: capturing a task must never require setting up
+    a sprint first. With no sprint at all, it falls back to the Backlog.
+    """
+    resp = client.post("/api/tasks", json={"title": "just a thought"})
+    assert resp.status_code == 201
+
+    container = client.get(f"/api/sprints/{resp.json()['sprint_id']}").json()
+    assert container["name"] == "Backlog"
+    assert container["container_type"] == "list"
+    assert container["is_protected"] is True
 
 
 def test_defaults(client, sprint):

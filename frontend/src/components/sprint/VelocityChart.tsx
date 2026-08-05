@@ -3,7 +3,9 @@ import type { SprintWithStats } from "../../api/types";
 
 export function VelocityChart({ sprints }: { sprints: SprintWithStats[] }) {
   const data = [...sprints]
-    .sort((a, b) => a.start_date.localeCompare(b.start_date))
+    // Only time-boxed sprints have velocity; lists carry no dates to order by.
+    .filter((s) => s.container_type === "sprint" && s.start_date)
+    .sort((a, b) => (a.start_date ?? "").localeCompare(b.start_date ?? ""))
     .slice(-8)
     .map((s) => ({
       name: s.name.length > 14 ? `${s.name.slice(0, 14)}…` : s.name,

@@ -88,6 +88,26 @@ sequenceDiagram
 16 tables. Sprints own tasks; notes and KB articles float free but can attach to tasks;
 everything can be tagged; every mutation lands in `activity_log`.
 
+### Task containers
+
+The `sprints` table is really a *task container* with a type. Both flavours hold tasks
+identically; they differ only in how much ceremony they carry.
+
+| | `list` | `sprint` |
+|---|---|---|
+| Dates | none | required |
+| Close & carry-over | never | yes |
+| Retro, goals, velocity | hidden | yes |
+| How many active | any number | exactly one |
+
+One container is flagged `is_protected` — the **Backlog**. It cannot be deleted, and task
+creation falls back to it whenever no sprint is running. That combination is what makes the
+`tasks.sprint_id` FK safely `NOT NULL`: there are no orphan tasks and no null-handling spread
+through queries, yet capturing a task never requires setting up a sprint first.
+
+Kanban isn't a third mode — the board *is* kanban. Board-vs-checklist is a per-container
+`default_view` preference, orthogonal to container type.
+
 ```mermaid
 erDiagram
     sprints ||--o{ tasks : contains
@@ -110,9 +130,12 @@ erDiagram
     sprints {
         int id PK
         text name
-        date start_date
-        date end_date
+        text container_type "sprint|list"
+        date start_date "null on lists"
+        date end_date "null on lists"
         text status "planned|active|closed"
+        text default_view "board|list"
+        bool is_protected "the Backlog"
     }
     tasks {
         int id PK
@@ -172,6 +195,8 @@ erDiagram
 | `search_vector` as a **generated** column + GIN index | Search index can never drift from content — Postgres recomputes it on every write, no trigger to forget. |
 | Attachments are **polymorphic with a CHECK** | Exactly one of `task_id`/`note_id`/`kb_article_id` must be set; the database enforces it rather than trusting callers. |
 | `carried_from_task_id` self-reference | Sprint carry-over builds a chain you can walk back through generations, instead of mutating the original. |
+| Container **type** rather than a global "planning mode" setting | People mix styles — real sprints for one workstream, a standing list for another. A per-container type lets both coexist; a global mode would force a choice and hide features you'd want. |
+| Protected Backlog instead of a nullable `sprint_id` | Keeps the FK `NOT NULL` (no orphans, no null-handling everywhere) while still guaranteeing a task can always be captured. |
 | Enums as `TEXT` + `CHECK`, not native enum types | Adding a value is a plain migration, not an `ALTER TYPE` dance. Mirrored in Pydantic `Literal`s so bad values fail at 422 before reaching the DB. |
 | `activity_log` append-only, `detail_json` as JSONB | Uniform audit shape across every entity without a column per change type. |
 

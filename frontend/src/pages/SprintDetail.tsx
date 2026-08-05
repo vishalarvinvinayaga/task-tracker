@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "../components/layout/Header";
 import { KanbanBoard } from "../components/sprint/KanbanBoard";
+import { TaskChecklist } from "../components/sprint/TaskChecklist";
 import { SprintHeader } from "../components/sprint/SprintHeader";
 import { SprintGoals } from "../components/sprint/SprintGoals";
 import { SprintCloseModal } from "../components/sprint/SprintCloseModal";
@@ -12,15 +13,16 @@ import { sprintsApi } from "../api/sprints";
 import { tasksApi } from "../api/tasks";
 import { tagsApi } from "../api/tags";
 import { useToast } from "../hooks/useToast";
-import type { SprintWithStats, Tag, TaskStatus } from "../api/types";
+import type { ContainerView, SprintWithStats, Tag, TaskStatus } from "../api/types";
 
 export function SprintDetail() {
   const { id } = useParams();
-  const sprintId = Number(id);
+  const containerId = Number(id);
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [sprint, setSprint] = useState<SprintWithStats | null>(null);
+  const [container, setContainer] = useState<SprintWithStats | null>(null);
+  const [view, setView] = useState<ContainerView | null>(null);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [openTaskId, setOpenTaskId] = useState<number | null>(null);
@@ -28,17 +30,31 @@ export function SprintDetail() {
   const [closing, setClosing] = useState(false);
 
   function load() {
-    sprintsApi.get(sprintId).then(setSprint);
+    sprintsApi.get(containerId).then((c) => {
+      setContainer(c);
+      // Adopt the container's saved preference on first load only, so a manual
+      // toggle isn't undone by a background refresh.
+      setView((current) => current ?? c.default_view);
+    });
   }
 
   useEffect(() => {
+    setView(null);
     load();
     tagsApi.list().then(setAllTags);
-  }, [sprintId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [containerId]);
 
   function bump() {
     load();
     setRefreshKey((k) => k + 1);
+  }
+
+  function changeView(next: ContainerView) {
+    setView(next);
+    sprintsApi.update(containerId, { default_view: next }).catch(() => {
+      toast.show("Couldn't save view preference", "error");
+    });
   }
 
   async function createTask(values: TaskFormValues) {
@@ -51,7 +67,7 @@ export function SprintDetail() {
       ticket_url: values.task_type === "development" ? values.ticket_url || undefined : undefined,
       due_date: values.due_date || undefined,
       estimated_hours: values.estimated_hours ? Number(values.estimated_hours) : undefined,
-      sprint_id: sprintId,
+      sprint_id: containerId,
       tag_ids: values.tag_ids,
       status: addingStatus ?? "todo",
     });
@@ -60,19 +76,34 @@ export function SprintDetail() {
     toast.show("Task created");
   }
 
-  if (!sprint) return null;
+  if (!container || !view) return null;
+
+  const isSprint = container.container_type === "sprint";
 
   return (
     <>
-      <Header title="Sprint board" />
-      <SprintHeader sprint={sprint} onCloseSprint={() => setClosing(true)} />
-      <SprintGoals sprintId={sprintId} goals={sprint.goals} onChanged={load} />
-      <KanbanBoard
-        sprintId={sprintId}
-        onOpenTask={setOpenTaskId}
-        refreshKey={refreshKey}
-        onAddTask={(status) => setAddingStatus(status)}
-      />
+      <Header title={isSprint ? "Sprint board" : container.name} code={isSprint ? "SPR" : "LST"} />
+      <SprintHeader sprint={container} view={view} onViewChange={changeView} onCloseSprint={() => setClosing(true)} />
+
+      {/* Goals are sprint ceremony — a plain list has nothing to track against. */}
+      {isSprint && <SprintGoals sprintId={containerId} goals={container.goals} onChanged={load} />}
+
+      {view === "board" ? (
+        <KanbanBoard
+          sprintId={containerId}
+          onOpenTask={setOpenTaskId}
+          refreshKey={refreshKey}
+          onAddTask={(status) => setAddingStatus(status)}
+        />
+      ) : (
+        <TaskChecklist
+          containerId={containerId}
+          refreshKey={refreshKey}
+          onOpenTask={setOpenTaskId}
+          onChanged={bump}
+          onAddTask={() => setAddingStatus("todo")}
+        />
+      )}
 
       {addingStatus && (
         <Modal title="New task" onClose={() => setAddingStatus(null)}>
@@ -86,13 +117,11 @@ export function SprintDetail() {
 
       {closing && (
         <SprintCloseModal
-          sprint={sprint}
+          sprint={container}
           onClose={() => setClosing(false)}
-          onClosed={(nextSprintId) => {
+          onClosed={() => {
             setClosing(false);
-            toast.show("Sprint closed");
-            navigate(`/sprints/${sprintId}/retro`);
-            void nextSprintId;
+            navigate(`/sprints/${containerId}/retro`);
           }}
         />
       )}

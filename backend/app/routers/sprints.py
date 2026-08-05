@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.activity import log_activity
+from app.containers import require_sprint
 from app.database import get_db
 from app.models import Sprint, SprintGoal, SprintRetro, Task
 from app.schemas import (
@@ -36,8 +37,13 @@ def _with_stats(db: Session, sprint: Sprint) -> SprintWithStats:
 
 
 @router.get("", response_model=list[SprintWithStats])
-def list_sprints(db: Session = Depends(get_db)):
-    sprints = db.execute(select(Sprint).order_by(Sprint.start_date.desc())).scalars().all()
+def list_sprints(container_type: str | None = None, db: Session = Depends(get_db)):
+    stmt = select(Sprint)
+    if container_type is not None:
+        stmt = stmt.where(Sprint.container_type == container_type)
+    # Sprints sort by date; lists have none, so fall back to creation order.
+    stmt = stmt.order_by(Sprint.start_date.desc().nullslast(), Sprint.created_at.desc())
+    sprints = db.execute(stmt).scalars().all()
     return [_with_stats(db, s) for s in sprints]
 
 
@@ -51,8 +57,12 @@ def get_sprint(sprint_id: int, db: Session = Depends(get_db)):
 
 @router.post("", response_model=SprintRead, status_code=201)
 def create_sprint(payload: SprintCreate, db: Session = Depends(get_db)):
-    if payload.status == "active":
-        existing = db.execute(select(Sprint).where(Sprint.status == "active")).scalar_one_or_none()
+    # Only a *sprint* competes for the single active slot — lists are always
+    # available and any number may coexist.
+    if payload.container_type == "sprint" and payload.status == "active":
+        existing = db.execute(
+            select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")
+        ).scalar_one_or_none()
         if existing:
             raise HTTPException(409, f"Sprint '{existing.name}' (id={existing.id}) is already active")
     sprint = Sprint(**payload.model_dump())
@@ -71,12 +81,21 @@ def update_sprint(sprint_id: int, payload: SprintUpdate, db: Session = Depends(g
         raise HTTPException(404, "Sprint not found")
 
     data = payload.model_dump(exclude_unset=True)
-    if data.get("status") == "active" and sprint.status != "active":
+    if data.get("status") == "active" and sprint.status != "active" and sprint.container_type == "sprint":
         existing = db.execute(
-            select(Sprint).where(Sprint.status == "active", Sprint.id != sprint_id)
+            select(Sprint).where(
+                Sprint.status == "active",
+                Sprint.container_type == "sprint",
+                Sprint.id != sprint_id,
+            )
         ).scalar_one_or_none()
         if existing:
             raise HTTPException(409, f"Sprint '{existing.name}' (id={existing.id}) is already active. Close it first.")
+
+    # A list has no lifecycle to advance and no dates to set.
+    if sprint.container_type == "list":
+        for field in ("status", "start_date", "end_date"):
+            data.pop(field, None)
 
     old_status = sprint.status
     for key, value in data.items():
@@ -96,6 +115,10 @@ def delete_sprint(sprint_id: int, db: Session = Depends(get_db)):
     sprint = db.get(Sprint, sprint_id)
     if not sprint:
         raise HTTPException(404, "Sprint not found")
+    if sprint.is_protected:
+        # Deleting the Backlog would reintroduce the "nowhere to put a task"
+        # state this whole design exists to prevent.
+        raise HTTPException(400, f"'{sprint.name}' is protected and cannot be deleted.")
     db.delete(sprint)
     db.commit()
 
@@ -105,6 +128,7 @@ def close_sprint(sprint_id: int, payload: SprintCloseRequest, db: Session = Depe
     sprint = db.get(Sprint, sprint_id)
     if not sprint:
         raise HTTPException(404, "Sprint not found")
+    require_sprint(sprint)
     next_sprint = db.get(Sprint, payload.next_sprint_id)
     if not next_sprint:
         raise HTTPException(404, "Target sprint not found")
@@ -183,8 +207,10 @@ def get_retro(sprint_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{sprint_id}/retro", response_model=SprintRetroRead)
 def upsert_retro(sprint_id: int, payload: SprintRetroUpsert, db: Session = Depends(get_db)):
-    if not db.get(Sprint, sprint_id):
+    container = db.get(Sprint, sprint_id)
+    if not container:
         raise HTTPException(404, "Sprint not found")
+    require_sprint(container)
     retro = db.execute(select(SprintRetro).where(SprintRetro.sprint_id == sprint_id)).scalar_one_or_none()
     if not retro:
         retro = SprintRetro(sprint_id=sprint_id, **payload.model_dump())

@@ -1,18 +1,22 @@
 import { api } from "../lib/api";
-import type { Sprint, SprintGoal, SprintRetro, SprintWithStats } from "./types";
+import type { ContainerType, ContainerView, Sprint, SprintGoal, SprintRetro, SprintWithStats } from "./types";
 
 export type SprintCreateInput = {
   name: string;
+  container_type?: ContainerType;
   goals_summary?: string | null;
-  start_date: string;
-  end_date: string;
+  /** Required for sprints, ignored for lists. */
+  start_date?: string | null;
+  end_date?: string | null;
   status?: string;
+  default_view?: ContainerView;
 };
 
 export type SprintUpdateInput = Partial<SprintCreateInput>;
 
 export const sprintsApi = {
-  list: () => api.get<SprintWithStats[]>("/sprints"),
+  list: (containerType?: ContainerType) =>
+    api.get<SprintWithStats[]>(`/sprints${containerType ? `?container_type=${containerType}` : ""}`),
   get: (id: number) => api.get<SprintWithStats>(`/sprints/${id}`),
   create: (data: SprintCreateInput) => api.post<Sprint>("/sprints", data),
   update: (id: number, data: SprintUpdateInput) => api.put<Sprint>(`/sprints/${id}`, data),

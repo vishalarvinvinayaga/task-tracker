@@ -28,7 +28,7 @@ def get_today_plan() -> dict:
     current punch-in status, today's hours worked, and inbox item count. This is the
     main 'plan my day' tool."""
     with session() as db:
-        sprint = db.execute(select(Sprint).where(Sprint.status == "active")).scalar_one_or_none()
+        sprint = db.execute(select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")).scalar_one_or_none()
         today = dt.date.today()
         today_tasks = []
         if sprint:
@@ -67,7 +67,7 @@ def get_sprint_summary(sprint_id: int | None = None) -> dict:
     """Get a summary of a sprint (defaults to the active sprint): name, dates, goals with
     progress, task counts by status, estimated vs actual hours, and days remaining."""
     with session() as db:
-        sprint = db.get(Sprint, sprint_id) if sprint_id else db.execute(select(Sprint).where(Sprint.status == "active")).scalar_one_or_none()
+        sprint = db.get(Sprint, sprint_id) if sprint_id else db.execute(select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")).scalar_one_or_none()
         if not sprint:
             return {"error": "No sprint found"}
         tasks = db.execute(select(Task).where(Task.sprint_id == sprint.id)).scalars().all()
@@ -94,7 +94,7 @@ def get_standup() -> dict:
             select(Task).where(Task.status == "done", Task.updated_at.between(yesterday_start, yesterday_end))
         ).scalars().all()
 
-        sprint = db.execute(select(Sprint).where(Sprint.status == "active")).scalar_one_or_none()
+        sprint = db.execute(select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")).scalar_one_or_none()
         today_planned = []
         blocked = []
         if sprint:

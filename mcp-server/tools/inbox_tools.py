@@ -45,7 +45,7 @@ def resolve_inbox_item(inbox_id: int, resolve_to: str, title: str | None = None,
 
         resolved_id = None
         if resolve_to == "task":
-            sprint = db.execute(select(Sprint).where(Sprint.status == "active")).scalar_one_or_none()
+            sprint = db.execute(select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")).scalar_one_or_none()
             if not sprint:
                 return {"error": "No active sprint to add the task to"}
             task = Task(sprint_id=sprint.id, title=title or item.content)

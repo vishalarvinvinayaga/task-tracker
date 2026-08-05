@@ -64,7 +64,7 @@ def _is_due(entry: RecurringTask, now: dt.datetime) -> bool:
 def run_recurring_generation(db: Session) -> list[Task]:
     """Create tasks for any active recurring_tasks that are due. Called on app startup and via manual trigger."""
     now = dt.datetime.now()
-    active_sprint = db.execute(select(Sprint).where(Sprint.status == "active")).scalar_one_or_none()
+    active_sprint = db.execute(select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")).scalar_one_or_none()
     if not active_sprint:
         return []
 

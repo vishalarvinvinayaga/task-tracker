@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.activity import log_activity
+from app.containers import resolve_default_container_id
 from app.database import get_db
 from app.models import Sprint, Tag, Task, Template
 from app.schemas import TaskCreate, TaskDetail, TaskMove, TaskRead, TaskUpdate
@@ -11,11 +12,9 @@ from app.tag_utils import resolve_tags
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 
-def _active_sprint_id(db: Session) -> int:
-    sprint = db.execute(select(Sprint).where(Sprint.status == "active")).scalar_one_or_none()
-    if not sprint:
-        raise HTTPException(400, "No active sprint. Specify sprint_id or activate a sprint first.")
-    return sprint.id
+def _default_container_id(db: Session) -> int:
+    """Active sprint if there is one, otherwise the Backlog. Never fails."""
+    return resolve_default_container_id(db)
 
 
 @router.get("", response_model=list[TaskRead])
@@ -67,7 +66,7 @@ def get_task(task_id: int, db: Session = Depends(get_db)):
 @router.post("", response_model=TaskRead, status_code=201)
 def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
     data = payload.model_dump(exclude={"tag_ids"})
-    sprint_id = data.pop("sprint_id", None) or _active_sprint_id(db)
+    sprint_id = data.pop("sprint_id", None) or _default_container_id(db)
 
     template: Template | None = None
     if payload.template_id:
@@ -120,6 +119,13 @@ def update_task(task_id: int, payload: TaskUpdate, db: Session = Depends(get_db)
         raise HTTPException(404, "Task not found")
 
     data = payload.model_dump(exclude_unset=True, exclude={"tag_ids"})
+
+    if "sprint_id" in data:
+        if not db.get(Sprint, data["sprint_id"]):
+            raise HTTPException(404, "Target container not found")
+        if data["sprint_id"] != task.sprint_id:
+            log_activity(db, "task", task.id, "moved_container", {"from": task.sprint_id, "to": data["sprint_id"]})
+
     old_status = task.status
     for key, value in data.items():
         setattr(task, key, value)

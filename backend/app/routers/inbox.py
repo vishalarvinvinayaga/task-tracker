@@ -44,7 +44,7 @@ def resolve_item(item_id: int, payload: InboxResolveRequest, db: Session = Depen
     resolved_id: int | None = None
 
     if payload.resolve_to == "task":
-        sprint = db.execute(select(Sprint).where(Sprint.status == "active")).scalar_one_or_none()
+        sprint = db.execute(select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")).scalar_one_or_none()
         if not sprint:
             raise HTTPException(400, "No active sprint to add the task to")
         task = Task(sprint_id=sprint.id, title=data.get("title", item.content))

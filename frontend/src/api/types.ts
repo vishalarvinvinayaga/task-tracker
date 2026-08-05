@@ -5,6 +5,9 @@ export type Tag = {
 };
 
 export type SprintStatus = "planned" | "active" | "closed";
+/** A sprint is time-boxed with ceremony; a list is a plain always-available bucket. */
+export type ContainerType = "sprint" | "list";
+export type ContainerView = "board" | "list";
 
 export type SprintGoal = {
   id: number;
@@ -17,10 +20,15 @@ export type SprintGoal = {
 export type Sprint = {
   id: number;
   name: string;
+  container_type: ContainerType;
   goals_summary: string | null;
-  start_date: string;
-  end_date: string;
+  /** null on lists — only sprints are time-boxed. */
+  start_date: string | null;
+  end_date: string | null;
   status: SprintStatus;
+  default_view: ContainerView;
+  /** The Backlog: guarantees somewhere always exists to put a task. */
+  is_protected: boolean;
   created_at: string;
   updated_at: string;
 };

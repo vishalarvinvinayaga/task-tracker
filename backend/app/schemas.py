@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class SanitizedModel(BaseModel):
@@ -40,9 +40,11 @@ class TagCreate(SanitizedModel):
     color: str = "#6B7280"
 
 
-# ---------------- Sprints ----------------
+# ---------------- Containers (sprints & lists) ----------------
 
 SprintStatus = Literal["planned", "active", "closed"]
+ContainerType = Literal["sprint", "list"]
+ContainerView = Literal["board", "list"]
 
 
 class SprintGoalRead(SanitizedModel):
@@ -82,10 +84,24 @@ class SprintRetroUpsert(SanitizedModel):
 
 class SprintCreate(SanitizedModel):
     name: str
+    container_type: ContainerType = "sprint"
     goals_summary: str | None = None
-    start_date: dt.date
-    end_date: dt.date
+    start_date: dt.date | None = None
+    end_date: dt.date | None = None
     status: SprintStatus = "planned"
+    default_view: ContainerView = "board"
+
+    @model_validator(mode="after")
+    def _check_dates_match_type(self):
+        if self.container_type == "sprint" and not (self.start_date and self.end_date):
+            raise ValueError("A sprint needs both a start_date and an end_date")
+        if self.container_type == "list":
+            # Lists are not time-boxed; silently drop dates rather than reject,
+            # so a client toggling type mid-form doesn't have to clear them.
+            self.start_date = None
+            self.end_date = None
+            self.status = "active"
+        return self
 
 
 class SprintUpdate(SanitizedModel):
@@ -94,16 +110,20 @@ class SprintUpdate(SanitizedModel):
     start_date: dt.date | None = None
     end_date: dt.date | None = None
     status: SprintStatus | None = None
+    default_view: ContainerView | None = None
 
 
 class SprintRead(SanitizedModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
+    container_type: str
     goals_summary: str | None
-    start_date: dt.date
-    end_date: dt.date
+    start_date: dt.date | None
+    end_date: dt.date | None
     status: str
+    default_view: str
+    is_protected: bool
     created_at: dt.datetime
     updated_at: dt.datetime
 
@@ -143,6 +163,9 @@ class TaskCreate(SanitizedModel):
 
 class TaskUpdate(SanitizedModel):
     title: str | None = None
+    # Re-homing a task between containers — e.g. pulling it off the Backlog
+    # into the active sprint.
+    sprint_id: int | None = None
     description_md: str | None = None
     status: TaskStatus | None = None
     priority: TaskPriority | None = None

@@ -36,10 +36,15 @@ export function Dashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   function load() {
-    sprintsApi.list().then((sprints) => {
-      const active = sprints.find((s) => s.status === "active") ?? null;
-      setActiveSprint(active);
-      if (active) tasksApi.list({ sprint_id: active.id }).then(setTasks);
+    sprintsApi.list().then((containers) => {
+      // Prefer the running sprint; otherwise show the Backlog so the dashboard
+      // is useful to people who don't work in cycles at all.
+      const focus =
+        containers.find((c) => c.container_type === "sprint" && c.status === "active") ??
+        containers.find((c) => c.is_protected) ??
+        null;
+      setActiveSprint(focus);
+      if (focus) tasksApi.list({ sprint_id: focus.id }).then(setTasks);
       else setTasks([]);
     });
     tagsApi.list().then(setAllTags);
@@ -56,7 +61,7 @@ export function Dashboard() {
   const pct = activeSprint && activeSprint.task_count > 0
     ? Math.round((activeSprint.done_count / activeSprint.task_count) * 100)
     : 0;
-  const daysLeft = activeSprint
+  const daysLeft = activeSprint?.end_date
     ? Math.ceil((new Date(activeSprint.end_date).getTime() - Date.now()) / 86_400_000)
     : 0;
   const openCount = tasks.filter((t) => t.status !== "done").length;

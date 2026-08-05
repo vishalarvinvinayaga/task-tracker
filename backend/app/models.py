@@ -22,20 +22,45 @@ from app.database import Base
 
 
 # ============================================================
-# 1. SPRINTS
+# 1. CONTAINERS (table name `sprints` kept for migration continuity)
+#
+# A container holds tasks. Two flavours, differing only in ceremony:
+#
+#   sprint — time-boxed. Dates required, closes with carry-over and a retro,
+#            contributes to velocity. Only one may be active at a time.
+#   list   — a plain bucket. No dates, never closes, no retro. Any number can
+#            exist side by side, which suits parallel workstreams.
+#
+# Tasks keep a NOT NULL FK to a container: there are no orphan tasks, and the
+# protected Backlog list guarantees somewhere always exists to put one.
 # ============================================================
 class Sprint(Base):
     __tablename__ = "sprints"
     __table_args__ = (
         CheckConstraint("status IN ('planned', 'active', 'closed')", name="ck_sprints_status"),
+        CheckConstraint("container_type IN ('sprint', 'list')", name="ck_sprints_container_type"),
+        CheckConstraint("default_view IN ('board', 'list')", name="ck_sprints_default_view"),
+        # A sprint is time-boxed by definition; a list must not carry dates.
+        CheckConstraint(
+            "(container_type = 'sprint' AND start_date IS NOT NULL AND end_date IS NOT NULL)"
+            " OR container_type = 'list'",
+            name="ck_sprints_dates_required_for_sprints",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    container_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="sprint")
     goals_summary: Mapped[str | None] = mapped_column(Text)
-    start_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
-    end_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    start_date: Mapped[dt.date | None] = mapped_column(Date)
+    end_date: Mapped[dt.date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="planned")
+    # How this container opens by default — a flat checklist suits some lists
+    # better than kanban columns.
+    default_view: Mapped[str] = mapped_column(Text, nullable=False, server_default="board")
+    # The Backlog is protected so the app can never reach a state with nowhere
+    # to put a task.
+    is_protected: Mapped[bool] = mapped_column(nullable=False, server_default="false")
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 

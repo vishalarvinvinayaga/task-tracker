@@ -8,71 +8,106 @@ import { useToast } from "../hooks/useToast";
 import type { SprintWithStats } from "../api/types";
 
 const STATUS_STYLE: Record<string, string> = {
-  active: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
-  planned: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  closed: "bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  active: "text-emerald-400 border-emerald-400/40",
+  planned: "text-sky-400 border-sky-400/40",
+  closed: "text-slate-400 border-slate-400/30",
 };
 
+function ContainerCard({ container }: { container: SprintWithStats }) {
+  const pct = container.task_count > 0 ? Math.round((container.done_count / container.task_count) * 100) : 0;
+  const isSprint = container.container_type === "sprint";
+
+  return (
+    <Link to={`/sprints/${container.id}`} className="glass-card block p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate font-medium">{container.name}</span>
+          {isSprint ? (
+            <span
+              className={`hud-mono shrink-0 border px-1.5 py-0.5 text-[9px] uppercase tracking-wider ${STATUS_STYLE[container.status]}`}
+            >
+              {container.status}
+            </span>
+          ) : (
+            <span className="hud-mono shrink-0 border border-[var(--hud-line)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--hud-text-dim)]">
+              {container.is_protected ? "backlog" : "list"}
+            </span>
+          )}
+        </div>
+        {isSprint && container.start_date && (
+          <span className="hud-readout shrink-0 text-[11px] text-[var(--hud-text-dim)]">
+            {container.start_date} → {container.end_date}
+          </span>
+        )}
+      </div>
+      <div className="mt-2.5 flex items-center gap-3">
+        <div className="progress-track h-1.5">
+          <div className="progress-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="hud-readout shrink-0 text-[11px] text-[var(--hud-text-dim)]">
+          {container.done_count}/{container.task_count}
+        </span>
+      </div>
+    </Link>
+  );
+}
+
 export function Sprints() {
-  const [sprints, setSprints] = useState<SprintWithStats[]>([]);
+  const [containers, setContainers] = useState<SprintWithStats[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const toast = useToast();
 
   function load() {
-    sprintsApi.list().then(setSprints);
+    sprintsApi.list().then(setContainers);
   }
 
   useEffect(load, []);
 
+  const sprints = containers.filter((c) => c.container_type === "sprint");
+  const lists = containers.filter((c) => c.container_type === "list");
+
   return (
     <>
-      <Header title="Sprints" />
-      <div className="p-6">
-        <div className="mb-4 flex justify-end">
+      <Header title="Boards" code="SPR" />
+      <div className="space-y-6 p-5">
+        <div className="flex justify-end">
           <button
             onClick={() => setShowCreate(true)}
-            className="rounded-lg btn-primary px-4 py-2 text-sm font-medium text-white"
+            className="btn-primary px-4 py-2 text-sm font-semibold uppercase tracking-wider"
           >
-            Create Sprint
+            New container
           </button>
         </div>
 
-        {sprints.length === 0 && (
-          <p className="text-sm text-gray-400">No sprints yet. Create one to get started.</p>
+        {containers.length === 0 && (
+          <p className="text-sm text-[var(--hud-text-dim)]">
+            Nothing here yet. Create a sprint if you work in cycles, or a list if you just want somewhere to
+            put tasks.
+          </p>
         )}
 
-        <VelocityChart sprints={sprints} />
+        {sprints.length > 0 && (
+          <section>
+            <h2 className="hud-label mb-2.5">Sprints</h2>
+            <VelocityChart sprints={sprints} />
+            <div className="space-y-2">
+              {sprints.map((s) => (
+                <ContainerCard key={s.id} container={s} />
+              ))}
+            </div>
+          </section>
+        )}
 
-        <div className="space-y-2">
-          {sprints.map((s) => {
-            const pct = s.task_count > 0 ? Math.round((s.done_count / s.task_count) * 100) : 0;
-            return (
-              <Link
-                key={s.id}
-                to={`/sprints/${s.id}`}
-                className="block rounded-lg glass-card p-4"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{s.name}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[s.status]}`}>{s.status}</span>
-                  </div>
-                  <span className="text-sm text-gray-400">
-                    {s.start_date} → {s.end_date}
-                  </span>
-                </div>
-                <div className="mt-2 flex items-center gap-3">
-                  <div className="progress-track h-1.5">
-                    <div className="progress-fill" style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="text-xs text-gray-400">
-                    {s.done_count}/{s.task_count}
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+        {lists.length > 0 && (
+          <section>
+            <h2 className="hud-label mb-2.5">Lists</h2>
+            <div className="space-y-2">
+              {lists.map((l) => (
+                <ContainerCard key={l.id} container={l} />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
 
       {showCreate && (
@@ -83,9 +118,9 @@ export function Sprints() {
               await sprintsApi.create(data);
               setShowCreate(false);
               load();
-              toast.show("Sprint created");
+              toast.show(`${data.container_type === "list" ? "List" : "Sprint"} created`);
             } catch (err) {
-              toast.show(err instanceof Error ? err.message : "Failed to create sprint", "error");
+              toast.show(err instanceof Error ? err.message : "Failed to create", "error");
             }
           }}
         />
