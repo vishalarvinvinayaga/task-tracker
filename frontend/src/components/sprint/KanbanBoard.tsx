@@ -4,10 +4,12 @@ import {
   DragOverlay,
   PointerSensor,
   closestCorners,
+  defaultDropAnimationSideEffects,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
+  type DropAnimation,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { tasksApi } from "../../api/tasks";
@@ -17,6 +19,15 @@ import { KanbanColumn } from "./KanbanColumn";
 import { KanbanCard } from "./KanbanCard";
 
 type Board = Record<TaskStatus, Task[]>;
+
+/** Settles the card into its slot with an easing that reads as physical weight. */
+const DROP_ANIMATION: DropAnimation = {
+  duration: 320,
+  easing: "cubic-bezier(0.18, 0.89, 0.32, 1.28)",
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: { active: { opacity: "0.25" } },
+  }),
+};
 
 function group(tasks: Task[]): Board {
   const board: Board = { todo: [], in_progress: [], review: [], done: [] };
@@ -102,7 +113,7 @@ export function KanbanBoard({
               status === "todo" ? (
                 <button
                   onClick={() => onAddTask(status)}
-                  className="text-xs font-medium text-blue-600 hover:underline"
+                  className="hud-label transition-colors hover:text-[var(--accent-via)]"
                 >
                   + Add
                 </button>
@@ -115,7 +126,9 @@ export function KanbanBoard({
           </KanbanColumn>
         ))}
       </div>
-      <DragOverlay>{activeTask && <KanbanCard task={activeTask} onClick={() => {}} />}</DragOverlay>
+      <DragOverlay dropAnimation={DROP_ANIMATION}>
+        {activeTask && <KanbanCard task={activeTask} onClick={() => {}} overlay />}
+      </DragOverlay>
     </DndContext>
   );
 }

@@ -55,29 +55,35 @@ export function PunchClock({ collapsed }: { collapsed: boolean }) {
         onClick={toggle}
         disabled={busy}
         title={status.punched_in ? "Punch out" : "Punch in"}
-        className={`w-full rounded-lg px-2 py-2 text-xs font-medium ${
-          status.punched_in ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" : "bg-gray-100 text-gray-500 dark:bg-gray-800"
-        }`}
+        className="btn-ghost w-full px-2 py-2 text-xs"
+        style={status.punched_in ? { borderColor: "var(--hud-line-strong)", color: "var(--accent-via)" } : undefined}
       >
-        {status.punched_in ? "⏱" : "⏸"}
+        {status.punched_in ? "◉" : "◎"}
       </button>
     );
   }
 
   return (
-    <div className="rounded-lg bg-gray-100 p-2 dark:bg-gray-800">
-      <div className="mb-1.5 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>{status.punched_in ? `Session: ${formatHours(liveElapsed)}` : "Not punched in"}</span>
-        <span>{formatHours(todayTotal)} today</span>
+    <div className="hud-frame p-2" style={{ "--hud-notch": "6px" } as React.CSSProperties}>
+      <div className="mb-2 flex items-center justify-between">
+        <span className="hud-label flex items-center gap-1.5">
+          {status.punched_in && (
+            <span
+              className="hud-live-dot inline-block h-1.5 w-1.5 rounded-full"
+              style={{ color: "var(--accent-via)", background: "var(--accent-via)" }}
+            />
+          )}
+          {status.punched_in ? formatHours(liveElapsed) : "Standby"}
+        </span>
+        <span className="hud-readout text-[10px] text-[var(--hud-text-dim)]">{formatHours(todayTotal)}</span>
       </div>
       <button
         onClick={toggle}
         disabled={busy}
-        className={`w-full rounded-lg px-3 py-1.5 text-sm font-medium ${
-          status.punched_in
-            ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300"
-            : "bg-green-600 text-white hover:bg-green-700"
+        className={`w-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wider ${
+          status.punched_in ? "btn-ghost text-rose-400" : "btn-primary"
         }`}
+        style={status.punched_in ? { borderColor: "rgba(244,63,94,0.5)" } : undefined}
       >
         {status.punched_in ? "Punch Out" : "Punch In"}
       </button>

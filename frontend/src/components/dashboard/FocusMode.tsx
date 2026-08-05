@@ -38,7 +38,11 @@ export function FocusMode({ tasks, onOpenTask, onLogged }: { tasks: Task[]; onOp
 
   if (!focusTask) {
     return (
-      <div className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-400 dark:border-gray-700">
+      <div
+        className="hud-frame flex items-center gap-3 px-4 py-5 text-sm text-[var(--hud-text-dim)]"
+        style={{ borderStyle: "dashed" }}
+      >
+        <span className="hud-mono text-[10px] tracking-widest opacity-60">STANDBY</span>
         No task in progress. Pick one up from your sprint board.
       </div>
     );
@@ -48,24 +52,40 @@ export function FocusMode({ tasks, onOpenTask, onLogged }: { tasks: Task[]; onOp
   const secs = elapsed % 60;
 
   return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
-      <div className="flex items-center justify-between">
-        <button onClick={() => onOpenTask(focusTask.id)} className="flex items-center gap-2 text-left font-medium hover:underline">
-          <span className={`h-2.5 w-2.5 rounded-full ${PRIORITY_DOT[focusTask.priority]}`} />
-          {focusTask.title}
+    <div
+      className="hud-frame hud-bracket relative px-5 py-4"
+      style={{
+        borderColor: "var(--hud-line-strong)",
+        boxShadow: "inset 0 0 60px -22px color-mix(in srgb, var(--accent-via) 85%, transparent)",
+      }}
+    >
+      <div className="flex items-center justify-between gap-4">
+        <button
+          onClick={() => onOpenTask(focusTask.id)}
+          className="flex min-w-0 items-center gap-2.5 text-left font-medium transition-colors hover:text-[var(--accent-via)]"
+        >
+          <span className={`h-2.5 w-2.5 shrink-0 rotate-45 ${PRIORITY_DOT[focusTask.priority]}`} />
+          <span className="truncate">{focusTask.title}</span>
         </button>
-        <span className="font-mono text-sm text-gray-500">
-          {mins}:{secs.toString().padStart(2, "0")}
+        <span
+          className={`hud-readout shrink-0 text-lg tabular-nums ${running ? "hud-live-dot" : ""}`}
+          style={running ? { color: "var(--accent-via)" } : { color: "var(--hud-text-dim)" }}
+        >
+          {mins.toString().padStart(2, "0")}:{secs.toString().padStart(2, "0")}
         </span>
       </div>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3.5 flex gap-2">
         {!running ? (
-          <button onClick={start} className="rounded-lg btn-primary px-3 py-1.5 text-sm font-medium text-white">
-            Start timer
+          <button onClick={start} className="btn-primary px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider">
+            Engage timer
           </button>
         ) : (
-          <button onClick={stop} className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">
-            Stop &amp; log time
+          <button
+            onClick={stop}
+            className="btn-ghost px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-rose-400"
+            style={{ borderColor: "rgba(244,63,94,0.5)" }}
+          >
+            Disengage &amp; log
           </button>
         )}
       </div>

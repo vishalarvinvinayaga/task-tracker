@@ -7,8 +7,23 @@ function formatDay(dateStr: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export function TrendChart({ days = 14 }: { days?: number }) {
+/** Reads the live accent tokens so charts track the user's theme preset. */
+function useAccent() {
+  const [accent, setAccent] = useState({ from: "#22d3ee", via: "#38bdf8", to: "#0ea5e9" });
+  useEffect(() => {
+    const style = getComputedStyle(document.documentElement);
+    setAccent({
+      from: style.getPropertyValue("--accent-from").trim() || "#22d3ee",
+      via: style.getPropertyValue("--accent-via").trim() || "#38bdf8",
+      to: style.getPropertyValue("--accent-to").trim() || "#0ea5e9",
+    });
+  }, []);
+  return accent;
+}
+
+export function TrendChart({ days = 14, embedded = false }: { days?: number; embedded?: boolean }) {
   const [data, setData] = useState<TrendPoint[]>([]);
+  const accent = useAccent();
 
   useEffect(() => {
     statsApi.trends(days).then(setData);
@@ -17,44 +32,83 @@ export function TrendChart({ days = 14 }: { days?: number }) {
   const totalCompleted = data.reduce((s, d) => s + d.tasks_completed, 0);
   const totalHours = data.reduce((s, d) => s + d.hours_logged, 0);
 
-  return (
-    <div className="glass-card rounded-xl p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+  const chart = (
+    <>
+      {!embedded && (
+        <h3 className="hud-label mb-3">
           Last {days} days — {totalCompleted} tasks completed, {totalHours.toFixed(1)}h logged
         </h3>
-      </div>
+      )}
       <ResponsiveContainer width="100%" height={220}>
         <AreaChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
           <defs>
             <linearGradient id="tasksGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#6366f1" stopOpacity={0.5} />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+              <stop offset="0%" stopColor={accent.via} stopOpacity={0.55} />
+              <stop offset="100%" stopColor={accent.via} stopOpacity={0} />
             </linearGradient>
             <linearGradient id="hoursGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#a855f7" stopOpacity={0.4} />
-              <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
+              <stop offset="0%" stopColor={accent.to} stopOpacity={0.4} />
+              <stop offset="100%" stopColor={accent.to} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-gray-200 dark:text-white/10" vertical={false} />
-          <XAxis dataKey="date" tickFormatter={formatDay} tick={{ fontSize: 11, fill: "currentColor" }} className="text-gray-400" axisLine={false} tickLine={false} />
-          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "currentColor" }} className="text-gray-400" axisLine={false} tickLine={false} width={28} />
+          <CartesianGrid strokeDasharray="2 6" stroke="var(--hud-line)" vertical={false} />
+          <XAxis
+            dataKey="date"
+            tickFormatter={formatDay}
+            tick={{ fontSize: 10, fill: "currentColor", fontFamily: "ui-monospace, monospace" }}
+            className="text-[var(--hud-text-dim)]"
+            axisLine={{ stroke: "var(--hud-line)" }}
+            tickLine={false}
+          />
+          <YAxis
+            allowDecimals={false}
+            tick={{ fontSize: 10, fill: "currentColor", fontFamily: "ui-monospace, monospace" }}
+            className="text-[var(--hud-text-dim)]"
+            axisLine={false}
+            tickLine={false}
+            width={28}
+          />
           <Tooltip
             labelFormatter={(v) => formatDay(String(v))}
-            contentStyle={{ background: "rgba(17,17,27,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }}
+            contentStyle={{
+              background: "rgba(3,7,17,0.94)",
+              border: "1px solid var(--hud-line-strong)",
+              borderRadius: 0,
+              fontSize: 11,
+              fontFamily: "ui-monospace, monospace",
+            }}
           />
-          <Area type="monotone" dataKey="tasks_completed" name="Tasks completed" stroke="#6366f1" strokeWidth={2} fill="url(#tasksGradient)" />
-          <Area type="monotone" dataKey="hours_logged" name="Hours logged" stroke="#a855f7" strokeWidth={2} fill="url(#hoursGradient)" />
+          <Area
+            type="monotone"
+            dataKey="tasks_completed"
+            name="Tasks completed"
+            stroke={accent.via}
+            strokeWidth={1.8}
+            fill="url(#tasksGradient)"
+          />
+          <Area
+            type="monotone"
+            dataKey="hours_logged"
+            name="Hours logged"
+            stroke={accent.to}
+            strokeWidth={1.8}
+            fill="url(#hoursGradient)"
+          />
         </AreaChart>
       </ResponsiveContainer>
-      <div className="mt-2 flex gap-4 text-xs text-gray-400">
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#6366f1" }} /> Tasks completed
+      <div className="mt-2 flex gap-4">
+        <span className="hud-label flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5" style={{ background: accent.via, boxShadow: `0 0 6px 1px ${accent.via}` }} />
+          Tasks completed · {totalCompleted}
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#a855f7" }} /> Hours logged
+        <span className="hud-label flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5" style={{ background: accent.to, boxShadow: `0 0 6px 1px ${accent.to}` }} />
+          Hours logged · {totalHours.toFixed(1)}
         </span>
       </div>
-    </div>
+    </>
   );
+
+  if (embedded) return chart;
+  return <div className="glass-card p-4">{chart}</div>;
 }

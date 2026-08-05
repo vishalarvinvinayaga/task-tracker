@@ -32,39 +32,41 @@ export function SetupWizard() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <div className="glass-panel w-full max-w-lg rounded-2xl p-8 shadow-2xl">
-        <div className="mb-1 flex items-center gap-2">
+    <div className="hud-grid-bg flex min-h-screen items-center justify-center p-6">
+      <div className="hud-frame hud-bracket hud-scanline hud-boot w-full max-w-lg p-8 shadow-2xl">
+        <div className="mb-2 flex items-center gap-2">
           <span
-            className="inline-block h-2.5 w-2.5 rounded-full"
-            style={{ backgroundImage: "linear-gradient(90deg, var(--accent-from), var(--accent-to))" }}
+            className="hud-live-dot inline-block h-2 w-2 rotate-45"
+            style={{ color: "var(--accent-via)", background: "var(--accent-via)" }}
           />
-          <span className="gradient-text text-sm font-semibold uppercase tracking-wide">Welcome</span>
+          <span className="hud-label !text-[10px]">System Initialisation</span>
         </div>
-        <h1 className="mb-1 text-2xl font-semibold">Let's set up your Command Center</h1>
-        <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
-          Just a few things, then it's yours — sprints, notes, time tracking, all in one place.
+        <h1 className="mb-1.5 text-2xl font-semibold tracking-wide">
+          Bringing your <span className="gradient-text">Command Center</span> online
+        </h1>
+        <p className="mb-7 text-sm text-[var(--hud-text-dim)]">
+          Three parameters, then you're operational — sprints, notes, and time tracking in one console.
         </p>
 
         <div className="space-y-5">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">What should we call you?</label>
+            <label className="hud-label mb-1.5 block">01 · Operator</label>
             <input
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="Your name"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5"
+              className="w-full border border-[var(--hud-line)] bg-transparent px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--hud-line-strong)]"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Timezone</label>
+            <label className="hud-label mb-1.5 block">02 · Local Time Zone</label>
             <select
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5"
+              className="w-full border border-[var(--hud-line)] bg-transparent px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--hud-line-strong)] dark:bg-[#050b16]"
             >
               {timezoneOptions.map((tz) => (
                 <option key={tz} value={tz}>
@@ -72,11 +74,13 @@ export function SetupWizard() {
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-400">Detected: {detected.replace(/_/g, " ")}. Used for greetings and display — change anytime.</p>
+            <p className="hud-readout mt-1.5 text-[10px] text-[var(--hud-text-dim)]">
+              AUTO-DETECTED: {detected.replace(/_/g, " ")}
+            </p>
           </div>
 
           <div>
-            <label className="mb-2 block text-xs font-medium text-gray-500">Pick your accent color</label>
+            <label className="hud-label mb-2 block">03 · Interface Signature</label>
             <div className="grid grid-cols-3 gap-2">
               {(Object.entries(THEME_PRESETS) as [ThemePreset, (typeof THEME_PRESETS)[ThemePreset]][]).map(([key, p]) => (
                 <button
@@ -86,25 +90,30 @@ export function SetupWizard() {
                     setPreset(key);
                     applyThemePreset(key);
                   }}
-                  className={`rounded-lg border p-2 text-left transition-all ${
-                    preset === key ? "border-transparent ring-2 ring-offset-2 ring-offset-transparent" : "border-gray-200 dark:border-white/10"
-                  }`}
-                  style={preset === key ? { boxShadow: `0 0 0 2px ${p.via}` } : undefined}
+                  className="border p-2 text-left transition-all"
+                  style={{
+                    borderColor: preset === key ? p.via : "var(--hud-line)",
+                    boxShadow: preset === key ? `0 0 18px -6px ${p.via}` : undefined,
+                  }}
                 >
                   <div
-                    className="mb-1.5 h-6 w-full rounded-md"
+                    className="mb-1.5 h-5 w-full"
                     style={{ backgroundImage: `linear-gradient(90deg, ${p.from}, ${p.via}, ${p.to})` }}
                   />
-                  <span className="text-[11px] font-medium">{p.label}</span>
+                  <span className="hud-mono text-[9px] font-semibold uppercase tracking-wider">{p.label}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="hud-readout text-xs text-rose-400">⚠ {error}</p>}
 
-          <button onClick={submit} disabled={busy} className="btn-primary w-full rounded-lg px-4 py-2.5 text-sm font-semibold">
-            {busy ? "Setting up…" : "Enter Command Center"}
+          <button
+            onClick={submit}
+            disabled={busy}
+            className="btn-primary w-full px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.14em]"
+          >
+            {busy ? "Initialising…" : "Bring systems online"}
           </button>
         </div>
       </div>

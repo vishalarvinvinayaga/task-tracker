@@ -2,6 +2,7 @@ import { Route, Routes } from "react-router-dom";
 import { Sidebar } from "./components/layout/Sidebar";
 import { CommandBar } from "./components/layout/CommandBar";
 import { SetupWizard } from "./components/setup/SetupWizard";
+import { GridBackdrop } from "./components/hud/GridBackdrop";
 import { useProfile } from "./hooks/useProfile";
 import { Dashboard } from "./pages/Dashboard";
 import { Sprints } from "./pages/Sprints";
@@ -24,9 +25,10 @@ function App() {
   if (!profile) return <SetupWizard />;
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="relative flex h-screen overflow-hidden">
+      <GridBackdrop />
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <main className="relative z-10 flex-1 overflow-y-auto">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/sprints" element={<Sprints />} />
