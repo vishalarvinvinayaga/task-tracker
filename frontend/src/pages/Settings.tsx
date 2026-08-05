@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Header } from "../components/layout/Header";
+import { TagManager } from "../components/shared/TagManager";
 import { useProfile } from "../hooks/useProfile";
 import { useToast } from "../hooks/useToast";
 import { applyThemePreset, THEME_PRESETS } from "../lib/theme";
@@ -96,6 +97,15 @@ export function Settings() {
         <button onClick={save} disabled={busy} className="btn-primary w-full rounded-lg px-4 py-2.5 text-sm font-semibold">
           {busy ? "Saving…" : "Save settings"}
         </button>
+
+        <div className="glass-card rounded-xl p-5">
+          <h2 className="hud-label mb-1">Tags</h2>
+          <p className="mb-4 text-xs text-[var(--hud-text-dim)]">
+            Colour-coded labels shared across tasks, notes, and articles. Renaming one updates it
+            everywhere; deleting only removes the label, never the tagged item.
+          </p>
+          <TagManager />
+        </div>
       </div>
     </>
   );

@@ -390,7 +390,7 @@ class ActivityLog(Base):
     __tablename__ = "activity_log"
     __table_args__ = (
         CheckConstraint(
-            "entity_type IN ('sprint', 'task', 'note', 'kb', 'time', 'inbox', 'attachment')",
+            "entity_type IN ('sprint', 'task', 'note', 'kb', 'time', 'inbox', 'attachment', 'tag')",
             name="ck_activity_entity_type",
         ),
         Index("idx_activity_entity", "entity_type", "entity_id"),

@@ -4,6 +4,13 @@ export type Tag = {
   color: string;
 };
 
+/** Tag plus where it's currently applied — drives the delete confirmation. */
+export type TagWithUsage = Tag & {
+  task_count: number;
+  note_count: number;
+  kb_count: number;
+};
+
 export type SprintStatus = "planned" | "active" | "closed";
 /** A sprint is time-boxed with ceremony; a list is a plain always-available bucket. */
 export type ContainerType = "sprint" | "list";

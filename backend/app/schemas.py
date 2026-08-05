@@ -37,7 +37,19 @@ class TagRead(SanitizedModel):
 
 class TagCreate(SanitizedModel):
     name: str
-    color: str = "#6B7280"
+    color: str = Field(default="#6B7280", pattern=r"^#[0-9A-Fa-f]{6}$")
+
+
+class TagUpdate(SanitizedModel):
+    name: str | None = None
+    color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
+
+
+class TagWithUsage(TagRead):
+    """Where a tag is currently applied — drives the delete confirmation."""
+    task_count: int = 0
+    note_count: int = 0
+    kb_count: int = 0
 
 
 # ---------------- Containers (sprints & lists) ----------------
