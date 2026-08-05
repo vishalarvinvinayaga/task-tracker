@@ -1,12 +1,14 @@
 from app.database import SessionLocal
 from app.models import Tag, Template
 
+# Generic starting points for a fresh install — rename, recolour or delete any
+# of them from Settings → Tags once you know your own workstreams.
 TAGS = [
-    ("Aimee", "#3B82F6"),
-    ("Hemotag", "#EF4444"),
-    ("Immigration", "#F59E0B"),
-    ("Content", "#8B5CF6"),
-    ("Research", "#10B981"),
+    ("Work", "#3B82F6"),
+    ("Personal", "#10B981"),
+    ("Urgent", "#EF4444"),
+    ("Admin", "#F59E0B"),
+    ("Research", "#8B5CF6"),
 ]
 
 TEMPLATES = [
@@ -15,9 +17,9 @@ TEMPLATES = [
     ("Sprint Planning", "meeting_note", {"sections": ["Sprint Goal", "Task Breakdown", "Capacity Check", "Risks"]}),
     ("Sprint Retro", "meeting_note", {"sections": ["What Went Well", "What Needs Improvement", "Action Items"]}),
     (
-        "New Aimee Agent",
+        "New Feature",
         "task",
-        {"subtasks": ["Prompt engineering", "ElevenLabs agent config", "Knowledge base setup", "Twilio routing", "Testing & QA"]},
+        {"subtasks": ["Design", "Implementation", "Tests", "Documentation", "Review & QA"]},
     ),
 ]
 

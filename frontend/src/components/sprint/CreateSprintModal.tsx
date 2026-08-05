@@ -89,7 +89,7 @@ export function CreateSprintModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full border border-[var(--hud-line)] bg-transparent px-3 py-2 text-sm outline-none focus:border-[var(--hud-line-strong)]"
-            placeholder={isSprint ? "Sprint 12 — Aimee Webhook Overhaul" : "Someday / Reading / Errands"}
+            placeholder={isSprint ? "Sprint 12 — Checkout rewrite" : "Someday / Reading / Errands"}
           />
         </div>
 

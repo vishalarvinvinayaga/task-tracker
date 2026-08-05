@@ -9,6 +9,7 @@ import { SprintCloseModal } from "../components/sprint/SprintCloseModal";
 import { TaskDetail } from "../components/task/TaskDetail";
 import { TaskForm, type TaskFormValues } from "../components/task/TaskForm";
 import { Modal } from "../components/shared/Modal";
+import { ConfirmDialog } from "../components/shared/ConfirmDialog";
 import { sprintsApi } from "../api/sprints";
 import { tasksApi } from "../api/tasks";
 import { tagsApi } from "../api/tags";
@@ -28,6 +29,7 @@ export function SprintDetail() {
   const [openTaskId, setOpenTaskId] = useState<number | null>(null);
   const [addingStatus, setAddingStatus] = useState<TaskStatus | null>(null);
   const [closing, setClosing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   function load() {
     sprintsApi.get(containerId).then((c) => {
@@ -83,7 +85,23 @@ export function SprintDetail() {
   return (
     <>
       <Header title={isSprint ? "Sprint board" : container.name} code={isSprint ? "SPR" : "LST"} />
-      <SprintHeader sprint={container} view={view} onViewChange={changeView} onCloseSprint={() => setClosing(true)} />
+      <SprintHeader
+        sprint={container}
+        view={view}
+        onViewChange={changeView}
+        onCloseSprint={() => setClosing(true)}
+        onRename={async (name) => {
+          try {
+            await sprintsApi.update(containerId, { name });
+            load();
+            toast.show("Renamed");
+          } catch (err) {
+            toast.show(err instanceof Error ? err.message : "Couldn't rename", "error");
+            load();
+          }
+        }}
+        onDelete={() => setDeleting(true)}
+      />
 
       {/* Goals are sprint ceremony — a plain list has nothing to track against. */}
       {isSprint && <SprintGoals sprintId={containerId} goals={container.goals} onChanged={load} />}
@@ -113,6 +131,36 @@ export function SprintDetail() {
 
       {openTaskId && (
         <TaskDetail taskId={openTaskId} allTags={allTags} onClose={() => setOpenTaskId(null)} onChanged={bump} />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete "${container.name}"?`}
+          confirmText={container.task_count > 0 ? container.name : undefined}
+          body={
+            container.task_count > 0 ? (
+              <>
+                This permanently deletes the {isSprint ? "sprint" : "list"} and its{" "}
+                <strong>{container.task_count} task{container.task_count === 1 ? "" : "s"}</strong>, along
+                with their time logs and attachments. Notes written against those tasks survive as
+                standalone notes. This cannot be undone.
+              </>
+            ) : (
+              <>This {isSprint ? "sprint" : "list"} is empty, so nothing else is affected.</>
+            )
+          }
+          onCancel={() => setDeleting(false)}
+          onConfirm={async () => {
+            try {
+              await sprintsApi.remove(containerId);
+              toast.show(`Deleted "${container.name}"`);
+              navigate("/sprints");
+            } catch (err) {
+              toast.show(err instanceof Error ? err.message : "Couldn't delete", "error");
+              setDeleting(false);
+            }
+          }}
+        />
       )}
 
       {closing && (

@@ -68,7 +68,7 @@ export function Sprints() {
 
   return (
     <>
-      <Header title="Boards" code="SPR" />
+      <Header title="Tracker" code="TRK" />
       <div className="space-y-6 p-5">
         <div className="flex justify-end">
           <button

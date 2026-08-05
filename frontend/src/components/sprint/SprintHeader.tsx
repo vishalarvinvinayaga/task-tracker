@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import type { ContainerView, SprintWithStats } from "../../api/types";
+import { IconTrash } from "../hud/Icons";
 
 const STATUS_STYLE: Record<string, string> = {
   active: "text-emerald-400 border-emerald-400/40",
@@ -11,11 +13,15 @@ export function SprintHeader({
   view,
   onViewChange,
   onCloseSprint,
+  onRename,
+  onDelete,
 }: {
   sprint: SprintWithStats;
   view: ContainerView;
   onViewChange: (v: ContainerView) => void;
   onCloseSprint: () => void;
+  onRename: (name: string) => void;
+  onDelete: () => void;
 }) {
   const pct = sprint.task_count > 0 ? Math.round((sprint.done_count / sprint.task_count) * 100) : 0;
   const isSprint = sprint.container_type === "sprint";
@@ -23,12 +29,33 @@ export function SprintHeader({
     ? Math.ceil((new Date(sprint.end_date).getTime() - Date.now()) / 86_400_000)
     : null;
 
+  const [nameDraft, setNameDraft] = useState(sprint.name);
+  useEffect(() => setNameDraft(sprint.name), [sprint.name]);
+
   return (
     <div className="border-b border-[var(--hud-line)] px-6 py-4">
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="truncate text-lg font-semibold">{sprint.name}</h1>
+            {/* Click-to-rename, saved on blur — same pattern as task titles. */}
+            <input
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={() => {
+                const next = nameDraft.trim();
+                if (next && next !== sprint.name) onRename(next);
+                else setNameDraft(sprint.name);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                if (e.key === "Escape") {
+                  setNameDraft(sprint.name);
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              aria-label="Rename container"
+              className="min-w-0 flex-1 border-none bg-transparent text-lg font-semibold outline-none focus:underline"
+            />
             {isSprint ? (
               <span
                 className={`hud-mono shrink-0 border px-1.5 py-0.5 text-[9px] uppercase tracking-wider ${STATUS_STYLE[sprint.status]}`}
@@ -84,6 +111,19 @@ export function SprintHeader({
           {isSprint && sprint.status !== "closed" && (
             <button onClick={onCloseSprint} className="btn-ghost px-3 py-1.5 text-xs font-semibold uppercase tracking-wider">
               Close sprint
+            </button>
+          )}
+
+          {/* The Backlog is protected — deleting it would leave nowhere to
+              capture a task, so the control isn't offered. */}
+          {!sprint.is_protected && (
+            <button
+              onClick={onDelete}
+              title={`Delete ${isSprint ? "sprint" : "list"}`}
+              aria-label={`Delete ${sprint.name}`}
+              className="btn-ghost px-2.5 py-1.5 text-[var(--hud-text-dim)] transition-colors hover:text-rose-400"
+            >
+              <IconTrash className="h-4 w-4" />
             </button>
           )}
         </div>

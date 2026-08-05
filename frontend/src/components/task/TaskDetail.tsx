@@ -9,6 +9,7 @@ import { SlideOver } from "../shared/SlideOver";
 import { FileUploader } from "../shared/FileUploader";
 import { TicketBadge } from "./TicketBadge";
 import { TaskNotes } from "./TaskNotes";
+import { ConfirmDialog } from "../shared/ConfirmDialog";
 
 export function TaskDetail({
   taskId,
@@ -25,6 +26,7 @@ export function TaskDetail({
   const [titleDraft, setTitleDraft] = useState("");
   const [editingTitle, setEditingTitle] = useState(false);
   const [descDraft, setDescDraft] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [logHoursDraft, setLogHoursDraft] = useState("");
 
   function load() {
@@ -222,11 +224,38 @@ export function TaskDetail({
 
         <FileUploader parent={{ taskId }} />
 
-        <div className="border-t border-gray-200 pt-3 text-xs text-gray-400 dark:border-gray-800">
-          Sprint: <Link to={`/sprints/${task.sprint_id}`} className="underline">{task.sprint_name}</Link> · Created{" "}
-          {new Date(task.created_at).toLocaleDateString()} · Updated {new Date(task.updated_at).toLocaleDateString()}
+        <div className="flex items-center justify-between gap-3 border-t border-[var(--hud-line)] pt-3">
+          <span className="text-xs text-[var(--hud-text-dim)]">
+            In <Link to={`/sprints/${task.sprint_id}`} className="underline">{task.sprint_name}</Link> · Created{" "}
+            {new Date(task.created_at).toLocaleDateString()} · Updated{" "}
+            {new Date(task.updated_at).toLocaleDateString()}
+          </span>
+          <button
+            onClick={() => setDeleting(true)}
+            className="hud-mono shrink-0 text-[10px] uppercase tracking-wider text-[var(--hud-text-dim)] transition-colors hover:text-rose-400"
+          >
+            Delete task
+          </button>
         </div>
       </div>
+
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete "${task.title}"?`}
+          body={
+            <>
+              This permanently deletes the task along with its time logs and attachments. Any notes
+              written against it survive as standalone notes. This cannot be undone.
+            </>
+          }
+          onCancel={() => setDeleting(false)}
+          onConfirm={async () => {
+            await tasksApi.remove(taskId);
+            onChanged();
+            onClose();
+          }}
+        />
+      )}
     </SlideOver>
   );
 }

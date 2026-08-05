@@ -3,16 +3,31 @@ import { useState } from "react";
 import { useDarkMode } from "../../hooks/useDarkMode";
 import { useProfile } from "../../hooks/useProfile";
 import { PunchClock } from "../time/PunchClock";
+import {
+  IconCalendar,
+  IconChevronLeft,
+  IconChevronRight,
+  IconDashboard,
+  IconInbox,
+  IconKnowledge,
+  IconMoon,
+  IconNotes,
+  IconSettings,
+  IconSun,
+  IconTemplates,
+  IconTime,
+  IconTracker,
+} from "../hud/Icons";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", code: "DSH", end: true },
-  { to: "/sprints", label: "Sprints", code: "SPR" },
-  { to: "/notes", label: "Notes", code: "NTE" },
-  { to: "/kb", label: "Knowledge Base", code: "KDB" },
-  { to: "/calendar", label: "Calendar", code: "CAL" },
-  { to: "/time", label: "Time", code: "TME" },
-  { to: "/inbox", label: "Inbox", code: "INB" },
-  { to: "/templates", label: "Templates", code: "TPL" },
+  { to: "/", label: "Dashboard", Icon: IconDashboard, end: true },
+  { to: "/sprints", label: "Tracker", Icon: IconTracker },
+  { to: "/notes", label: "Notes", Icon: IconNotes },
+  { to: "/kb", label: "Knowledge Base", Icon: IconKnowledge },
+  { to: "/calendar", label: "Calendar", Icon: IconCalendar },
+  { to: "/time", label: "Time", Icon: IconTime },
+  { to: "/inbox", label: "Inbox", Icon: IconInbox },
+  { to: "/templates", label: "Templates", Icon: IconTemplates },
 ];
 
 export function Sidebar() {
@@ -26,7 +41,6 @@ export function Sidebar() {
         collapsed ? "w-[68px]" : "w-60"
       }`}
     >
-      {/* edge glow */}
       <span
         aria-hidden
         className="absolute inset-y-0 right-0 w-px"
@@ -47,30 +61,31 @@ export function Sidebar() {
         )}
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className="hud-label rounded p-1 transition-colors hover:text-[var(--accent-via)]"
-          aria-label="Toggle sidebar"
+          className="p-1 text-[var(--hud-text-dim)] transition-colors hover:text-[var(--accent-via)]"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand" : "Collapse"}
         >
-          {collapsed ? "»" : "«"}
+          {collapsed ? <IconChevronRight className="h-4 w-4" /> : <IconChevronLeft className="h-4 w-4" />}
         </button>
       </div>
 
       <nav className="flex-1 space-y-1 px-2">
-        {NAV_ITEMS.map((item) => (
+        {NAV_ITEMS.map(({ to, label, Icon, end }) => (
           <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
+            key={to}
+            to={to}
+            end={end}
             className={({ isActive }) =>
-              `group flex items-center gap-2.5 px-3 py-2 text-sm transition-all ${
+              `flex items-center gap-3 px-3 py-2 text-sm transition-all ${collapsed ? "justify-center" : ""} ${
                 isActive
                   ? "nav-item-active font-medium"
                   : "text-slate-600 hover:bg-[color-mix(in_srgb,var(--accent-via)_10%,transparent)] hover:text-[var(--accent-via)] dark:text-slate-300"
               }`
             }
-            title={collapsed ? item.label : undefined}
+            title={collapsed ? label : undefined}
           >
-            <span className="hud-mono shrink-0 text-[9px] font-bold tracking-wider opacity-60">{item.code}</span>
-            {!collapsed && <span className="truncate">{item.label}</span>}
+            <Icon className="h-[18px] w-[18px]" />
+            {!collapsed && <span className="truncate">{label}</span>}
           </NavLink>
         ))}
       </nav>
@@ -79,7 +94,7 @@ export function Sidebar() {
         <NavLink
           to="/settings"
           className={({ isActive }) =>
-            `flex items-center justify-between px-3 py-2 text-sm transition-all ${
+            `flex items-center gap-3 px-3 py-2 text-sm transition-all ${collapsed ? "justify-center" : ""} ${
               isActive
                 ? "nav-item-active font-medium"
                 : "text-slate-600 hover:bg-[color-mix(in_srgb,var(--accent-via)_10%,transparent)] hover:text-[var(--accent-via)] dark:text-slate-300"
@@ -87,21 +102,19 @@ export function Sidebar() {
           }
           title={collapsed ? "Settings" : undefined}
         >
-          {collapsed ? (
-            <span className="hud-mono text-[9px] font-bold tracking-wider opacity-60">CFG</span>
-          ) : (
-            <>
-              <span className="truncate">{profile?.name ?? "Settings"}</span>
-              <span className="hud-mono text-[9px] opacity-60">CFG</span>
-            </>
-          )}
+          <IconSettings className="h-[18px] w-[18px]" />
+          {!collapsed && <span className="truncate">{profile?.name ?? "Settings"}</span>}
         </NavLink>
 
         <button
           onClick={toggleDark}
-          className="hud-label w-full px-3 py-2 text-left transition-colors hover:text-[var(--accent-via)]"
+          className={`flex w-full items-center gap-3 px-3 py-2 text-sm text-[var(--hud-text-dim)] transition-colors hover:text-[var(--accent-via)] ${
+            collapsed ? "justify-center" : ""
+          }`}
+          title={dark ? "Switch to light mode" : "Switch to dark mode"}
         >
-          {collapsed ? (dark ? "☀" : "☾") : dark ? "Light mode" : "Dark mode"}
+          {dark ? <IconSun className="h-[18px] w-[18px]" /> : <IconMoon className="h-[18px] w-[18px]" />}
+          {!collapsed && <span>{dark ? "Light mode" : "Dark mode"}</span>}
         </button>
 
         <PunchClock collapsed={collapsed} />
