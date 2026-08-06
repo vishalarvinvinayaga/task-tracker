@@ -188,6 +188,25 @@ erDiagram
     }
 ```
 
+### Daily plans
+
+A **plan is a commitment** — "these are the things I intend to work on today". That's distinct
+from `due_date` (when something is *owed*) and from `status` (where it is *now*); neither can
+express intent, which is why plans previously had nowhere to live but free-text notes.
+
+Plans are never deleted. Once a day passes it **closes** and each item resolves to `done` or
+`slipped`, turning the table into a record of intent versus reality. Closing happens **lazily
+on access** rather than on a midnight timer, because a local app isn't running at midnight — a
+scheduled job would simply be missed. Every plan endpoint sweeps first, so the state self-heals
+after the app has been shut for days.
+
+`slip_count` is **derived**, never stored: count the closed plan items for a task with outcome
+`slipped`. One slip is ordinary; repeated slips are a signal that something is blocked, too
+big, or not actually wanted — so the UI escalates the badge rather than nagging identically.
+
+Items carry a `pinned` flag. Re-planning (including by Claude via `commit_daily_plan`) replaces
+only the *unpinned* items, so refining the day never clobbers a deliberate choice.
+
 ### Design decisions worth naming
 
 | Decision | Rationale |

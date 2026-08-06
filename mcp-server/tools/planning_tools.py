@@ -58,11 +58,38 @@ def get_today_plan() -> dict:
     """Get today's plan: active sprint summary, today's tasks (due today or in progress),
     current punch-in status, today's hours worked, and inbox item count. This is the
     main 'plan my day' tool."""
+    from app.models import DailyPlan
+    from app.routers.plans import build_suggestions, close_stale_plans
+
     with session() as db:
+        close_stale_plans(db)
         sprint = _active_sprint(db)
         today = dt.date.today()
         # Spans every container — a sprint is optional, not a prerequisite.
         today_tasks = _with_container(db, _actionable_today(db, today))
+
+        # A committed plan is the source of truth for the day; the computed
+        # list above is only what's *available* to plan from.
+        plan = db.execute(select(DailyPlan).where(DailyPlan.plan_date == today)).scalar_one_or_none()
+        committed = None
+        if plan:
+            committed = {
+                "focus": plan.focus,
+                "items": [
+                    {
+                        "task_id": i.task_id,
+                        "title": i.task.title,
+                        "status": i.task.status,
+                        "pinned": i.pinned,
+                        "source": i.source,
+                    }
+                    for i in plan.items
+                ],
+            }
+        suggestions = [
+            {"task_id": s.task.id, "title": s.task.title, "reason": s.reason, "slip_count": s.slip_count}
+            for s in build_suggestions(db, {i.task_id for i in plan.items} if plan else None)
+        ]
 
         open_session = db.execute(
             select(TimeLog).where(TimeLog.log_type == "punch_in", TimeLog.end_time.is_(None))
@@ -84,6 +111,10 @@ def get_today_plan() -> dict:
 
         return jsonable({
             "active_sprint": _sprint_stats(db, sprint) if sprint else None,
+            # The plan actually committed for today, or null if not planned yet.
+            "committed_plan": committed,
+            # Worth planning but not yet committed — offer these, don't assume.
+            "suggestions": suggestions,
             "today_tasks": today_tasks,
             "punched_in": punched_in,
             "hours_worked_today": round(hours_today, 2),
@@ -188,4 +219,77 @@ def get_weekly_summary(week_offset: int = 0) -> dict:
             "hours_logged": round(sum(float(e.duration_hours or 0) for e in time_entries), 2),
             "time_breakdown": {k: round(v, 2) for k, v in breakdown.items()},
             "carried_tasks": len(carried),
+        })
+
+
+@mcp.tool()
+def commit_daily_plan(
+    task_ids: list[int],
+    focus: str | None = None,
+    replace_unpinned: bool = True,
+) -> dict:
+    """Write today's actual plan — the tasks committed to for today.
+
+    Use this instead of saving a plan as a note: a plan is a commitment that
+    gets tracked, so unfinished items are flagged as slipped when the day ends.
+
+    Items the user pinned (kept deliberately) are never removed. By default
+    re-planning replaces only the unpinned items, so calling this again to
+    refine the day preserves the user's own choices. Pass replace_unpinned=False
+    to add to the plan without removing anything.
+
+    Call get_today_plan first to see what's already planned and what's suggested.
+    """
+    from app.models import DailyPlan, DailyPlanItem
+    from app.routers.plans import build_suggestions, close_stale_plans
+
+    with session() as db:
+        close_stale_plans(db)
+        today = dt.date.today()
+        plan = db.execute(select(DailyPlan).where(DailyPlan.plan_date == today)).scalar_one_or_none()
+
+        if plan is None:
+            plan = DailyPlan(plan_date=today, focus=focus)
+            db.add(plan)
+            db.flush()
+        elif focus is not None:
+            plan.focus = focus
+
+        if replace_unpinned:
+            for item in list(plan.items):
+                if not item.pinned:
+                    db.delete(item)
+            db.flush()
+
+        kept = {i.task_id for i in plan.items if i.pinned}
+        # Guard against every duplicate route: tasks already on the plan
+        # (pinned or not, when replace_unpinned is False) and repeats within
+        # the incoming list itself. (plan_id, task_id) is UNIQUE.
+        present = {i.task_id for i in plan.items}
+        order = max((i.sort_order for i in plan.items), default=-1) + 1
+        added = []
+        for task_id in task_ids:
+            if task_id in present or not db.get(Task, task_id):
+                continue
+            db.add(DailyPlanItem(plan_id=plan.id, task_id=task_id, source="claude", sort_order=order))
+            present.add(task_id)
+            added.append(task_id)
+            order += 1
+
+        db.commit()
+        db.refresh(plan)
+
+        return jsonable({
+            "plan_date": plan.plan_date,
+            "focus": plan.focus,
+            "committed": [
+                {"task_id": i.task_id, "title": i.task.title, "pinned": i.pinned, "source": i.source}
+                for i in plan.items
+            ],
+            "added": added,
+            "kept_pinned": sorted(kept),
+            "still_suggested": [
+                {"task_id": s.task.id, "title": s.task.title, "reason": s.reason}
+                for s in build_suggestions(db, {i.task_id for i in plan.items})
+            ],
         })

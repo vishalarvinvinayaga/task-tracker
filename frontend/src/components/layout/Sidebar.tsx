@@ -8,6 +8,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconDashboard,
+  IconPlan,
   IconInbox,
   IconKnowledge,
   IconMoon,
@@ -21,6 +22,7 @@ import {
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", Icon: IconDashboard, end: true },
+  { to: "/plans", label: "Daily Plan", Icon: IconPlan },
   { to: "/sprints", label: "Tracker", Icon: IconTracker },
   { to: "/notes", label: "Notes", Icon: IconNotes },
   { to: "/kb", label: "Knowledge Base", Icon: IconKnowledge },

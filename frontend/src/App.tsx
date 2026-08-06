@@ -5,6 +5,7 @@ import { SetupWizard } from "./components/setup/SetupWizard";
 import { GridBackdrop } from "./components/hud/GridBackdrop";
 import { useProfile } from "./hooks/useProfile";
 import { Dashboard } from "./pages/Dashboard";
+import { Plans } from "./pages/Plans";
 import { Sprints } from "./pages/Sprints";
 import { SprintDetail } from "./pages/SprintDetail";
 import { SprintRetro } from "./pages/SprintRetro";
@@ -31,6 +32,7 @@ function App() {
       <main className="relative z-10 flex-1 overflow-y-auto">
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/plans" element={<Plans />} />
           <Route path="/sprints" element={<Sprints />} />
           <Route path="/sprints/:id" element={<SprintDetail />} />
           <Route path="/sprints/:id/retro" element={<SprintRetro />} />

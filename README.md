@@ -93,7 +93,7 @@ cd frontend && npm run dev
 cd backend && venv/bin/pytest
 ```
 
-183 tests covering every router, the MCP planning tools, plus an adversarial suite (injection, XSS, path traversal,
+211 tests covering every router, the MCP planning tools, plus an adversarial suite (injection, XSS, path traversal,
 upload hardening). They run against **`planner_test_db`** — a separate database — and
 `conftest.py` aborts if pointed anywhere else, so running them can never touch your real data.
 
@@ -147,13 +147,16 @@ cd /Users/vishalarvin/Documents/task-planner-tracker && claude
 
 Accept the prompt to trust the project's MCP server, then just talk:
 
-- *"plan my day"* → `get_today_plan`
+- *"plan my day"* → `get_today_plan`, then `commit_daily_plan` to write it down
 - *"what's my standup?"* → `get_standup`
 - *"add a task to review the PREVENT paper, due Friday"* → `add_task`
 - *"punch me in"* / *"punch me out"* → `punch_in` / `punch_out`
 - *"how did this week go?"* → `get_weekly_summary`
 
-Confirm it's connected with `/mcp` — `personal-planner` should be listed with 22 tools.
+Confirm it's connected with `/mcp` — `personal-planner` should be listed with 23 tools.
+
+A plan Claude commits is a **real record**, not a note: it appears on the Daily Plan page,
+and anything left unfinished when the day closes is flagged as slipped.
 
 Planning spans **every container**, sprints and lists alike, so `get_today_plan` works
 whether or not you run sprints. Each task comes back labelled with the container it's in.
@@ -166,7 +169,7 @@ already has other `mcpServers` entries — don't overwrite), replacing
 Claude Desktop.
 
 The MCP server reads `backend/.env` for its database connection, so it always talks to the
-same data as the web app — no separate configuration needed. It exposes 22 tools covering
+same data as the web app — no separate configuration needed. It exposes 23 tools covering
 planning (`get_today_plan`, `get_standup`, `get_weekly_summary`, `get_sprint_summary`),
 tasks, notes, KB articles, time tracking, inbox capture/triage, and `send_to_task` (the
 primary way for Claude Code to push analysis output into a task as a note).

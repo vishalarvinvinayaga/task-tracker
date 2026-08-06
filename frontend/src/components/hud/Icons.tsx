@@ -125,3 +125,13 @@ export const IconChevronRight = (p: IconProps) => (
     <path d="M9.5 5.5 16 12l-6.5 6.5" />
   </Svg>
 );
+
+/** Checklist with a tick — the daily plan. */
+export const IconPlan = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M8 5.5h11M8 12h11M8 18.5h11" />
+    <path d="M3.5 5.2 4.6 6.3 6.4 4.2" />
+    <path d="M3.5 11.2 4.6 12.3 6.4 10.2" />
+    <circle cx="4.8" cy="18.5" r="1.2" />
+  </Svg>
+);

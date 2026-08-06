@@ -551,3 +551,73 @@ class UserProfileUpdate(SanitizedModel):
     name: str | None = None
     timezone: str | None = None
     theme_preset: ThemePreset | None = None
+
+
+# ---------------- Daily plans ----------------
+
+PlanOutcome = Literal["planned", "done", "slipped", "dropped"]
+PlanItemSource = Literal["suggested", "manual", "claude"]
+
+
+class PlanItemRead(SanitizedModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    task_id: int
+    outcome: str
+    pinned: bool
+    source: str
+    sort_order: int
+    carried_from_plan_id: int | None
+    # Denormalised for display — the UI shouldn't need a second round trip.
+    task: TaskRead
+    container_name: str | None = None
+    # How many previous days this task was planned and not finished.
+    slip_count: int = 0
+
+
+class DailyPlanRead(SanitizedModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    plan_date: dt.date
+    focus: str | None
+    closed_at: dt.datetime | None
+    created_at: dt.datetime
+    items: list[PlanItemRead] = []
+
+
+class PlanSuggestion(SanitizedModel):
+    """A task worth considering for today, with the reason it surfaced."""
+    task: TaskRead
+    container_name: str | None = None
+    reason: Literal["slipped", "due", "overdue", "in_progress"]
+    slip_count: int = 0
+
+
+class TodayPlanResponse(SanitizedModel):
+    """
+    `plan` is null until the day is deliberately committed — a plan should be
+    a choice, not something that materialises on page load.
+    """
+    plan: DailyPlanRead | None
+    suggestions: list[PlanSuggestion] = []
+
+
+class DailyPlanCreate(SanitizedModel):
+    task_ids: list[int] = Field(default_factory=list)
+    focus: str | None = None
+    source: PlanItemSource = "manual"
+
+
+class DailyPlanUpdate(SanitizedModel):
+    focus: str | None = None
+
+
+class PlanItemAdd(SanitizedModel):
+    task_id: int
+    pinned: bool = True
+    source: PlanItemSource = "manual"
+
+
+class PlanItemUpdate(SanitizedModel):
+    pinned: bool | None = None
+    outcome: PlanOutcome | None = None

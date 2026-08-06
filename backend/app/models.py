@@ -390,7 +390,7 @@ class ActivityLog(Base):
     __tablename__ = "activity_log"
     __table_args__ = (
         CheckConstraint(
-            "entity_type IN ('sprint', 'task', 'note', 'kb', 'time', 'inbox', 'attachment', 'tag')",
+            "entity_type IN ('sprint', 'task', 'note', 'kb', 'time', 'inbox', 'attachment', 'tag', 'plan')",
             name="ck_activity_entity_type",
         ),
         Index("idx_activity_entity", "entity_type", "entity_id"),
@@ -419,3 +419,71 @@ class UserProfile(Base):
     theme_preset: Mapped[str] = mapped_column(Text, nullable=False, server_default="indigo")
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+# ============================================================
+# 17. DAILY PLANS
+#
+# A plan is a *commitment*: "these are the things I intend to work on
+# today". That's distinct from due_date (when something is owed) and from
+# status (where it is now) — neither of which can express intent, which is
+# why plans previously had nowhere to live but free-text notes.
+#
+# Plans are never deleted. Once the day passes they close and become a
+# record of intent versus reality, which is what makes slip counting — and
+# any honest look at your own planning — possible.
+# ============================================================
+class DailyPlan(Base):
+    __tablename__ = "daily_plans"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    plan_date: Mapped[dt.date] = mapped_column(Date, nullable=False, unique=True)
+    # Free-text intention for the day — "ship the migration", "recover".
+    focus: Mapped[str | None] = mapped_column(Text)
+    # Set when the day rolls over and outcomes are resolved. NULL = still open.
+    closed_at: Mapped[dt.datetime | None] = mapped_column()
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[dt.datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+    # carried_from_plan_id is a second FK back to this table, so the join for
+    # `items` has to be stated explicitly.
+    items: Mapped[list["DailyPlanItem"]] = relationship(
+        back_populates="plan",
+        cascade="all, delete-orphan",
+        order_by="DailyPlanItem.sort_order",
+        foreign_keys="DailyPlanItem.plan_id",
+    )
+
+
+class DailyPlanItem(Base):
+    __tablename__ = "daily_plan_items"
+    __table_args__ = (
+        CheckConstraint(
+            "outcome IN ('planned', 'done', 'slipped', 'dropped')", name="ck_plan_items_outcome"
+        ),
+        CheckConstraint("source IN ('suggested', 'manual', 'claude')", name="ck_plan_items_source"),
+        # The same task can't be committed to twice in one day.
+        UniqueConstraint("plan_id", "task_id", name="uq_plan_items_plan_task"),
+        Index("idx_plan_items_plan", "plan_id"),
+        Index("idx_plan_items_task", "task_id"),
+        Index("idx_plan_items_outcome", "outcome"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("daily_plans.id", ondelete="CASCADE"), nullable=False)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    # 'planned' until the day closes, then resolved from the task's status.
+    outcome: Mapped[str] = mapped_column(Text, nullable=False, server_default="planned")
+    # Pinned items are deliberate choices — re-planning (including by Claude)
+    # replaces the merely-suggested items and leaves these alone.
+    pinned: Mapped[bool] = mapped_column(nullable=False, server_default="false")
+    source: Mapped[str] = mapped_column(Text, nullable=False, server_default="suggested")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    # Where this came from if it slipped off an earlier day.
+    carried_from_plan_id: Mapped[int | None] = mapped_column(
+        ForeignKey("daily_plans.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+
+    plan: Mapped["DailyPlan"] = relationship(back_populates="items", foreign_keys=[plan_id])
+    task: Mapped["Task"] = relationship()

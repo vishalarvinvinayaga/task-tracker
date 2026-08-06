@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 from app.config import settings
 from app.database import SessionLocal
-from app.routers import activity, attachments, inbox, kb, notes, profile, recurring, sprints, stats, tags, tasks, templates, time
+from app.routers import activity, plans, attachments, inbox, kb, notes, profile, recurring, sprints, stats, tags, tasks, templates, time
 from app.routers.recurring import run_recurring_generation
 
 app = FastAPI(title="Personal Command Center API", version="1.0.0")
@@ -73,6 +73,7 @@ app.include_router(inbox.router)
 app.include_router(attachments.router)
 app.include_router(stats.router)
 app.include_router(profile.router)
+app.include_router(plans.router)
 
 
 @app.exception_handler(IntegrityError)

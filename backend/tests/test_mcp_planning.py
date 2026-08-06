@@ -108,3 +108,61 @@ def test_empty_database_returns_an_empty_plan_not_an_error(client):
     plan = planning.get_today_plan()
     assert plan["today_tasks"] == []
     assert plan["active_sprint"] is None
+
+
+# ---------- commit_daily_plan: Claude writes a plan, not a note ----------
+
+def test_claude_can_commit_a_plan(client, sprint, task):
+    result = planning.commit_daily_plan(task_ids=[task["id"]], focus="ship the thing")
+
+    assert result["focus"] == "ship the thing"
+    assert [i["task_id"] for i in result["committed"]] == [task["id"]]
+    assert result["committed"][0]["source"] == "claude"
+
+    # It's a real record, visible to the web UI — not free text in a note.
+    assert client.get("/api/plans/today").json()["plan"]["focus"] == "ship the thing"
+
+
+def test_replanning_preserves_pinned_choices(client, sprint):
+    """The user's deliberate picks survive Claude re-planning the day."""
+    keep = client.post("/api/tasks", json={"title": "I chose this"}).json()
+    drop = client.post("/api/tasks", json={"title": "Claude suggested this"}).json()
+
+    plan = client.post("/api/plans/today", json={"task_ids": [keep["id"]]}).json()
+    planning.commit_daily_plan(task_ids=[drop["id"]], replace_unpinned=False)
+
+    # Unpin Claude's pick so re-planning is allowed to clear it
+    claude_item = next(i for i in client.get(f"/api/plans/{plan['id']}").json()["items"] if i["task_id"] == drop["id"])
+    client.patch(f"/api/plans/{plan['id']}/items/{claude_item['id']}", json={"pinned": False})
+
+    result = planning.commit_daily_plan(task_ids=[])
+
+    titles = [i["title"] for i in result["committed"]]
+    assert "I chose this" in titles
+    assert "Claude suggested this" not in titles
+    assert result["kept_pinned"] == [keep["id"]]
+
+
+def test_replanning_can_add_without_removing(client, sprint):
+    a = client.post("/api/tasks", json={"title": "first"}).json()
+    b = client.post("/api/tasks", json={"title": "second"}).json()
+    planning.commit_daily_plan(task_ids=[a["id"]])
+
+    result = planning.commit_daily_plan(task_ids=[b["id"]], replace_unpinned=False)
+    assert {i["title"] for i in result["committed"]} == {"first", "second"}
+
+
+def test_get_today_plan_reports_the_committed_plan(client, sprint, task):
+    assert planning.get_today_plan()["committed_plan"] is None
+
+    planning.commit_daily_plan(task_ids=[task["id"]], focus="today's focus")
+    plan = planning.get_today_plan()["committed_plan"]
+
+    assert plan["focus"] == "today's focus"
+    assert [i["task_id"] for i in plan["items"]] == [task["id"]]
+
+
+def test_committing_the_same_task_twice_is_a_no_op(client, sprint, task):
+    planning.commit_daily_plan(task_ids=[task["id"]])
+    result = planning.commit_daily_plan(task_ids=[task["id"], task["id"]], replace_unpinned=False)
+    assert len(result["committed"]) == 1
