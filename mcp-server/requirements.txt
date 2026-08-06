@@ -1,5 +1,8 @@
-mcp==1.2.0
+# Pinned to the 1.x line: `mcp.server.fastmcp` — the API this server is built
+# on — was removed in 2.0. 1.29.0 is the newest 1.x and clears the advisories
+# that affected 1.2.0.
+mcp==1.29.0
 sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
 pydantic-settings==2.7.0
-python-dotenv==1.0.1
+python-dotenv==1.2.2

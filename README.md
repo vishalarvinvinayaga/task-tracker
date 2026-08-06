@@ -8,7 +8,7 @@ Two ways to interact with the same data:
 
 1. **Web UI** — React app at `localhost:5173` for the sprint board, calendar, notes, KB, and dashboard.
 2. **Claude Desktop / Claude Code** — connected via an MCP server, so you can talk to your planner
-   conversationally ("plan my day", "add a task to the Aimee sprint", "summarize this week").
+   conversationally ("plan my day", "add a task", "summarize this week").
 
 ## Stack
 
@@ -93,7 +93,7 @@ cd frontend && npm run dev
 cd backend && venv/bin/pytest
 ```
 
-131 tests covering every router plus an adversarial suite (injection, XSS, path traversal,
+183 tests covering every router, the MCP planning tools, plus an adversarial suite (injection, XSS, path traversal,
 upload hardening). They run against **`planner_test_db`** — a separate database — and
 `conftest.py` aborts if pointed anywhere else, so running them can never touch your real data.
 
@@ -135,10 +135,28 @@ SQLAlchemy models as the backend (it imports directly from `backend/app`). Its v
 environment is already set up at `mcp-server/venv` (recreate with `python3.12 -m venv venv &&
 venv/bin/pip install -r requirements.txt` if needed).
 
-**Using Claude Code (this project, conversationally):** a project-scoped `.mcp.json` is
-already checked in at the repo root, registering the server. The first time you open a
-Claude Code session in this project, you'll be prompted to trust/approve it — accept, and
-its 21 tools become available in the conversation.
+### Planning your day from the CLI
+
+A project-scoped `.mcp.json` at the repo root registers the server. Claude Code loads it
+**at session start**, behind a one-time trust prompt — so an already-running session won't
+pick it up. Start a fresh one from the project directory:
+
+```bash
+cd /Users/vishalarvin/Documents/task-planner-tracker && claude
+```
+
+Accept the prompt to trust the project's MCP server, then just talk:
+
+- *"plan my day"* → `get_today_plan`
+- *"what's my standup?"* → `get_standup`
+- *"add a task to review the PREVENT paper, due Friday"* → `add_task`
+- *"punch me in"* / *"punch me out"* → `punch_in` / `punch_out`
+- *"how did this week go?"* → `get_weekly_summary`
+
+Confirm it's connected with `/mcp` — `personal-planner` should be listed with 22 tools.
+
+Planning spans **every container**, sprints and lists alike, so `get_today_plan` works
+whether or not you run sprints. Each task comes back labelled with the container it's in.
 
 **Using the standalone Claude Desktop app instead:** copy
 `docs/claude_desktop_config.example.json` into
@@ -148,7 +166,7 @@ already has other `mcpServers` entries — don't overwrite), replacing
 Claude Desktop.
 
 The MCP server reads `backend/.env` for its database connection, so it always talks to the
-same data as the web app — no separate configuration needed. It exposes 21 tools covering
+same data as the web app — no separate configuration needed. It exposes 22 tools covering
 planning (`get_today_plan`, `get_standup`, `get_weekly_summary`, `get_sprint_summary`),
 tasks, notes, KB articles, time tracking, inbox capture/triage, and `send_to_task` (the
 primary way for Claude Code to push analysis output into a task as a note).

@@ -7,6 +7,13 @@ from app_instance import mcp
 from tools._common import jsonable, session, sprint_dict, task_dict
 
 
+def _active_sprint(db) -> Sprint | None:
+    """The running time-boxed sprint, if the user works in cycles at all."""
+    return db.execute(
+        select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")
+    ).scalar_one_or_none()
+
+
 def _sprint_stats(db, sprint: Sprint) -> dict:
     tasks = db.execute(select(Task).where(Task.sprint_id == sprint.id)).scalars().all()
     done = [t for t in tasks if t.status == "done"]
@@ -18,8 +25,32 @@ def _sprint_stats(db, sprint: Sprint) -> dict:
         "estimated_hours": sum(float(t.estimated_hours or 0) for t in tasks),
         "actual_hours": sum(float(t.actual_hours or 0) for t in tasks),
         "goals": [{"title": g.title, "progress_pct": g.progress_pct} for g in goals],
-        "days_remaining": (sprint.end_date - dt.date.today()).days,
+        # Lists aren't time-boxed, so there's no countdown to report.
+        "days_remaining": (sprint.end_date - dt.date.today()).days if sprint.end_date else None,
     }
+
+
+def _with_container(db, tasks: list[Task]) -> list[dict]:
+    """Task payloads annotated with the container they came from.
+
+    Planning spans every container, so 'which list is this from?' stops being
+    obvious and has to be stated.
+    """
+    names = {s.id: s.name for s in db.execute(select(Sprint)).scalars().all()}
+    return [{**task_dict(t), "container": names.get(t.sprint_id)} for t in tasks]
+
+
+def _actionable_today(db, today: dt.date) -> list[Task]:
+    """
+    Everything worth looking at today, across sprints *and* lists.
+
+    Previously this only searched the active sprint, so anyone planning with
+    plain lists got an empty plan.
+    """
+    tasks = db.execute(
+        select(Task).where(Task.status != "done").order_by(Task.sort_order, Task.created_at)
+    ).scalars().all()
+    return [t for t in tasks if t.status == "in_progress" or (t.due_date and t.due_date <= today)]
 
 
 @mcp.tool()
@@ -28,12 +59,10 @@ def get_today_plan() -> dict:
     current punch-in status, today's hours worked, and inbox item count. This is the
     main 'plan my day' tool."""
     with session() as db:
-        sprint = db.execute(select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")).scalar_one_or_none()
+        sprint = _active_sprint(db)
         today = dt.date.today()
-        today_tasks = []
-        if sprint:
-            tasks = db.execute(select(Task).where(Task.sprint_id == sprint.id)).scalars().all()
-            today_tasks = [task_dict(t) for t in tasks if t.due_date == today or t.status == "in_progress"]
+        # Spans every container — a sprint is optional, not a prerequisite.
+        today_tasks = _with_container(db, _actionable_today(db, today))
 
         open_session = db.execute(
             select(TimeLog).where(TimeLog.log_type == "punch_in", TimeLog.end_time.is_(None))
@@ -67,9 +96,12 @@ def get_sprint_summary(sprint_id: int | None = None) -> dict:
     """Get a summary of a sprint (defaults to the active sprint): name, dates, goals with
     progress, task counts by status, estimated vs actual hours, and days remaining."""
     with session() as db:
-        sprint = db.get(Sprint, sprint_id) if sprint_id else db.execute(select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")).scalar_one_or_none()
+        sprint = db.get(Sprint, sprint_id) if sprint_id else _active_sprint(db)
         if not sprint:
-            return {"error": "No sprint found"}
+            return {
+                "error": "No active sprint.",
+                "hint": "Tasks may still be in lists — use get_today_plan, which covers every container.",
+            }
         tasks = db.execute(select(Task).where(Task.sprint_id == sprint.id)).scalars().all()
         by_status: dict[str, int] = {}
         for t in tasks:
@@ -94,18 +126,18 @@ def get_standup() -> dict:
             select(Task).where(Task.status == "done", Task.updated_at.between(yesterday_start, yesterday_end))
         ).scalars().all()
 
-        sprint = db.execute(select(Sprint).where(Sprint.status == "active", Sprint.container_type == "sprint")).scalar_one_or_none()
-        today_planned = []
-        blocked = []
-        if sprint:
-            tasks = db.execute(select(Task).where(Task.sprint_id == sprint.id)).scalars().all()
-            today_planned = [task_dict(t) for t in tasks if t.status == "in_progress" or t.due_date == now.date()]
-            cutoff = now - dt.timedelta(days=2)
-            blocked = [
-                task_dict(t)
-                for t in tasks
-                if t.priority in ("high", "urgent") and t.status != "done" and t.updated_at < cutoff
-            ]
+        # Standup covers everything in flight, not just the current sprint.
+        today_planned = _with_container(db, _actionable_today(db, now.date()))
+
+        cutoff = now - dt.timedelta(days=2)
+        stalled = db.execute(
+            select(Task).where(
+                Task.status != "done",
+                Task.priority.in_(("high", "urgent")),
+                Task.updated_at < cutoff,
+            )
+        ).scalars().all()
+        blocked = _with_container(db, stalled)
 
         return jsonable({
             "yesterday_completed": [task_dict(t) for t in completed_yesterday],
