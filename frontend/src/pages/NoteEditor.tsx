@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Header } from "../components/layout/Header";
-import { MarkdownEditor } from "../components/notes/MarkdownEditor";
+import { LiveMarkdownEditor } from "../components/notes/LiveMarkdownEditor";
+import { SaveStatus } from "../components/notes/SaveStatus";
 import { NoteLinkSelector } from "../components/notes/NoteLinkSelector";
 import { PromoteToKB } from "../components/notes/PromoteToKB";
 import { TagPicker } from "../components/shared/TagPicker";
 import { FileUploader } from "../components/shared/FileUploader";
+import { ConfirmDialog } from "../components/shared/ConfirmDialog";
 import { notesApi } from "../api/notes";
 import { tagsApi } from "../api/tags";
 import { templatesApi } from "../api/templates";
 import { tasksApi } from "../api/tasks";
-import { useToast } from "../hooks/useToast";
+import { useAutosave, readDraft, clearDraft } from "../hooks/useAutosave";
 import type { Note, NoteLink, NoteType, Tag, Task, Template } from "../api/types";
 import { NOTE_TYPE_LABELS, SOURCE_LABELS } from "../api/types";
 
@@ -18,7 +20,6 @@ export function NoteEditor() {
   const { id } = useParams();
   const noteId = Number(id);
   const navigate = useNavigate();
-  const toast = useToast();
 
   const [note, setNote] = useState<Note | null>(null);
   const [content, setContent] = useState("");
@@ -28,12 +29,35 @@ export function NoteEditor() {
   const [linkedTitles, setLinkedTitles] = useState<Record<number, string>>({});
   const [meetingTemplates, setMeetingTemplates] = useState<Template[]>([]);
   const [sprintTasks, setSprintTasks] = useState<Task[]>([]);
+  const [recovered, setRecovered] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const draftKey = `note-draft:${noteId}`;
+
+  const save = useAutosave({
+    value: content,
+    draftKey,
+    onSave: (md) => notesApi.update(noteId, { content_md: md }),
+  });
 
   function load() {
     notesApi.get(noteId).then((n) => {
       setNote(n);
-      setContent(n.content_md ?? "");
       setTitleDraft(n.title);
+
+      // A local draft newer than the server copy means the last session ended
+      // before its save landed — prefer the draft, it's the newer intent.
+      const serverContent = n.content_md ?? "";
+      const draft = readDraft<string>(draftKey);
+      if (draft && draft.value !== serverContent && draft.at > new Date(n.updated_at).getTime()) {
+        setContent(draft.value);
+        save.reset(serverContent);
+        setRecovered(true);
+      } else {
+        setContent(serverContent);
+        save.reset(serverContent);
+        clearDraft(draftKey);
+      }
     });
     notesApi.listLinks(noteId).then(setLinks);
   }
@@ -141,23 +165,25 @@ export function NoteEditor() {
 
         <TagPicker allTags={allTags} selectedIds={note.tags.map((t) => t.id)} onChange={(ids) => patch({ tag_ids: ids })} />
 
-        <div
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-              e.preventDefault();
-              patch({ content_md: content }).then(() => toast.show("Note saved"));
-            }
-          }}
-        >
-          <MarkdownEditor value={content} onChange={setContent} />
-        </div>
-        <div className="flex justify-end">
-          <button
-            onClick={() => patch({ content_md: content }).then(() => toast.show("Note saved"))}
-            className="rounded-lg btn-primary px-4 py-2 text-sm font-medium text-white"
+        {recovered && (
+          <div
+            className="hud-frame flex items-center justify-between gap-3 px-3 py-2 text-xs"
+            style={{ borderColor: "rgba(251,191,36,0.5)" }}
           >
-            Save content <span className="ml-1 text-xs opacity-70">⌘⏎</span>
-          </button>
+            <span>
+              Recovered unsaved text from a previous session. It's already in the editor —
+              keep typing and it saves automatically.
+            </span>
+            <button onClick={() => setRecovered(false)} className="hud-label shrink-0 hover:text-[var(--accent-via)]">
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        <LiveMarkdownEditor value={content} onChange={setContent} onBlur={() => void save.flush()} />
+
+        <div className="flex items-center justify-end gap-3">
+          <SaveStatus state={save.state} />
         </div>
 
         <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
@@ -190,10 +216,38 @@ export function NoteEditor() {
 
         <FileUploader parent={{ noteId }} />
 
-        <button onClick={() => navigate(-1)} className="text-sm text-gray-500 hover:underline">
-          ← Back
-        </button>
+        <div className="flex items-center justify-between border-t border-[var(--hud-line)] pt-3">
+          <button onClick={() => navigate(-1)} className="text-sm text-[var(--hud-text-dim)] hover:underline">
+            ← Back
+          </button>
+          <button
+            onClick={() => setDeleting(true)}
+            className="hud-mono text-[10px] uppercase tracking-wider text-[var(--hud-text-dim)] transition-colors hover:text-rose-400"
+          >
+            Delete note
+          </button>
+        </div>
       </div>
+
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete "${note.title}"?`}
+          body={
+            <>
+              This permanently deletes the note and its attachments. Links to and from other notes
+              go with it; a KB article promoted from this note survives on its own. This cannot be
+              undone.
+            </>
+          }
+          onCancel={() => setDeleting(false)}
+          onConfirm={async () => {
+            await notesApi.remove(noteId);
+            // Drop the crash-recovery draft too, or the note would reappear.
+            clearDraft(draftKey);
+            navigate("/notes");
+          }}
+        />
+      )}
     </>
   );
 }

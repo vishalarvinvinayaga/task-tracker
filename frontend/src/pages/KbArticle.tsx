@@ -1,21 +1,21 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Header } from "../components/layout/Header";
-import { MarkdownEditor } from "../components/notes/MarkdownEditor";
+import { LiveMarkdownEditor } from "../components/notes/LiveMarkdownEditor";
+import { SaveStatus } from "../components/notes/SaveStatus";
 import { WikiLinkPreview } from "../components/kb/WikiLinkPreview";
 import { TagPicker } from "../components/shared/TagPicker";
 import { FileUploader } from "../components/shared/FileUploader";
 import { kbApi } from "../api/kb";
 import { tagsApi } from "../api/tags";
 import { notesApi } from "../api/notes";
-import { useToast } from "../hooks/useToast";
+import { useAutosave, readDraft, clearDraft } from "../hooks/useAutosave";
 import type { KbArticle, Note, Tag } from "../api/types";
 
 export function KbArticlePage() {
   const { id } = useParams();
   const articleId = Number(id);
   const navigate = useNavigate();
-  const toast = useToast();
 
   const [article, setArticle] = useState<KbArticle | null>(null);
   const [content, setContent] = useState("");
@@ -25,13 +25,33 @@ export function KbArticlePage() {
   const [allArticles, setAllArticles] = useState<KbArticle[]>([]);
   const [sourceNote, setSourceNote] = useState<Note | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [recovered, setRecovered] = useState(false);
+
+  const draftKey = `kb-draft:${articleId}`;
+
+  const save = useAutosave({
+    value: content,
+    draftKey,
+    onSave: (md) => kbApi.update(articleId, { content_md: md }),
+  });
 
   function load() {
     kbApi.get(articleId).then((a) => {
       setArticle(a);
-      setContent(a.content_md ?? "");
       setTitleDraft(a.title);
       if (a.source_note_id) notesApi.get(a.source_note_id).then(setSourceNote);
+
+      const serverContent = a.content_md ?? "";
+      const draft = readDraft<string>(draftKey);
+      if (draft && draft.value !== serverContent && draft.at > new Date(a.updated_at).getTime()) {
+        setContent(draft.value);
+        save.reset(serverContent);
+        setRecovered(true);
+      } else {
+        setContent(serverContent);
+        save.reset(serverContent);
+        clearDraft(draftKey);
+      }
     });
   }
 
@@ -103,23 +123,20 @@ export function KbArticlePage() {
               {showPreview ? "Hide" : "Show"} cross-linked preview
             </button>
           </div>
-          <div
-            onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                e.preventDefault();
-                patch({ content_md: content }).then(() => toast.show("Article saved"));
-              }
-            }}
-          >
-            <MarkdownEditor value={content} onChange={setContent} />
-          </div>
-          <div className="mt-2 flex justify-end">
-            <button
-              onClick={() => patch({ content_md: content }).then(() => toast.show("Article saved"))}
-              className="rounded-lg btn-primary px-4 py-2 text-sm font-medium text-white"
+          {recovered && (
+            <div
+              className="hud-frame mb-2 flex items-center justify-between gap-3 px-3 py-2 text-xs"
+              style={{ borderColor: "rgba(251,191,36,0.5)" }}
             >
-              Save content <span className="ml-1 text-xs opacity-70">⌘⏎</span>
-            </button>
+              <span>Recovered unsaved text from a previous session — it's already in the editor.</span>
+              <button onClick={() => setRecovered(false)} className="hud-label shrink-0 hover:text-[var(--accent-via)]">
+                Dismiss
+              </button>
+            </div>
+          )}
+          <LiveMarkdownEditor value={content} onChange={setContent} onBlur={() => void save.flush()} />
+          <div className="mt-2 flex justify-end">
+            <SaveStatus state={save.state} />
           </div>
         </div>
 

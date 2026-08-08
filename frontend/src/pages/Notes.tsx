@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "../components/layout/Header";
 import { NoteCard } from "../components/notes/NoteCard";
+import { ConfirmDialog } from "../components/shared/ConfirmDialog";
+import { clearDraft } from "../hooks/useAutosave";
 import { notesApi } from "../api/notes";
 import type { Note, NoteSearchResult, NoteType } from "../api/types";
 import { NOTE_TYPE_LABELS } from "../api/types";
@@ -13,6 +15,7 @@ export function Notes() {
   const [standaloneOnly, setStandaloneOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<NoteSearchResult[] | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Note | null>(null);
 
   function load() {
     notesApi.list({ note_type: noteType || undefined, standalone_only: standaloneOnly }).then(setNotes);
@@ -94,12 +97,31 @@ export function Notes() {
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {notes.map((n) => (
-              <NoteCard key={n.id} note={n} />
+              <NoteCard key={n.id} note={n} onDelete={setPendingDelete} />
             ))}
             {notes.length === 0 && <p className="text-sm text-gray-400">No notes yet.</p>}
           </div>
         )}
       </div>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={`Delete "${pendingDelete.title}"?`}
+          body={
+            <>
+              This permanently deletes the note and its attachments. A KB article promoted from it
+              survives on its own. This cannot be undone.
+            </>
+          }
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={async () => {
+            await notesApi.remove(pendingDelete.id);
+            clearDraft(`note-draft:${pendingDelete.id}`);
+            setPendingDelete(null);
+            load();
+          }}
+        />
+      )}
     </>
   );
 }
